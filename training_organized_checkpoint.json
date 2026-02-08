@@ -1,0 +1,92 @@
+{
+  "completed_categories": [
+    "pdf_PetaLinux",
+    "pdf_7_Series",
+    "pdf_UltraScale",
+    "pdf_Zynq_7000",
+    "pdf_Zynq_MPSoC",
+    "pdf_Versal",
+    "pdf_Vivado",
+    "pdf_Vitis",
+    "pdf_IP",
+    "pdf_Alveo",
+    "pdf_Virtex_5",
+    "pdf_Virtex_6",
+    "pdf_Spartan_6",
+    "pdf_CoolRunner",
+    "pdf_Other_PDFs"
+  ],
+  "current_category": "code_Arty_7Series",
+  "current_file_index": 18,
+  "total_files_processed": 3396,
+  "total_chunks_embedded": 1122492,
+  "category_stats": {
+    "pdf_PetaLinux": {
+      "files": 0,
+      "chunks": 0
+    },
+    "pdf_7_Series": {
+      "files": 322,
+      "chunks": 53369
+    },
+    "pdf_UltraScale": {
+      "files": 189,
+      "chunks": 60458
+    },
+    "pdf_Zynq_7000": {
+      "files": 142,
+      "chunks": 32386
+    },
+    "pdf_Zynq_MPSoC": {
+      "files": 101,
+      "chunks": 35224
+    },
+    "pdf_Versal": {
+      "files": 172,
+      "chunks": 114959
+    },
+    "pdf_Vivado": {
+      "files": 62,
+      "chunks": 38387
+    },
+    "pdf_Vitis": {
+      "files": 14,
+      "chunks": 17525
+    },
+    "pdf_IP": {
+      "files": 1309,
+      "chunks": 417066
+    },
+    "pdf_Alveo": {
+      "files": 91,
+      "chunks": 18072
+    },
+    "pdf_Virtex_5": {
+      "files": 253,
+      "chunks": 45345
+    },
+    "pdf_Virtex_6": {
+      "files": 184,
+      "chunks": 33283
+    },
+    "pdf_Spartan_6": {
+      "files": 183,
+      "chunks": 25123
+    },
+    "pdf_CoolRunner": {
+      "files": 228,
+      "chunks": 14380
+    },
+    "pdf_Other_PDFs": {
+      "files": 131,
+      "chunks": 91406
+    },
+    "code_Arty_7Series": {
+      "files": 15,
+      "chunks": 125509
+    }
+  },
+  "last_update": "2026-02-08T11:55:33.831109",
+  "status": "in_progress",
+  "errors": []
+}

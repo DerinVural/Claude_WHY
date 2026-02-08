@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gcp-rag-vivado"
+version = "0.1.0"
+description = "GCP-based RAG system with VIVADO FPGA acceleration"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+keywords = ["rag", "gcp", "vertex-ai", "fpga", "vivado", "embeddings"]
+
+dependencies = [
+    "google-generativeai>=0.8.0",
+    "chromadb>=0.4.0",
+    "pypdf>=4.0.0",
+    "python-dotenv>=1.0.0",
+    "numpy>=1.24.0",
+    "langchain>=0.1.0",
+    "langchain-google-genai>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.9.0",
+    "isort>=5.12.0",
+    "flake8>=6.1.0",
+    "mypy>=1.5.0",
+]
+fpga = [
+    "pynq>=3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/gcp-rag-vivado"
+Documentation = "https://github.com/yourusername/gcp-rag-vivado#readme"
+Repository = "https://github.com/yourusername/gcp-rag-vivado"
+Issues = "https://github.com/yourusername/gcp-rag-vivado/issues"
+
+[project.scripts]
+gcp-rag = "src.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py310', 'py311', 'py312']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --cov=src --cov-report=html"
