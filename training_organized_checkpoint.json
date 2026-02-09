@@ -14,12 +14,13 @@
     "pdf_Virtex_6",
     "pdf_Spartan_6",
     "pdf_CoolRunner",
-    "pdf_Other_PDFs"
+    "pdf_Other_PDFs",
+    "code_Arty_7Series"
   ],
-  "current_category": "code_Arty_7Series",
-  "current_file_index": 18,
-  "total_files_processed": 3396,
-  "total_chunks_embedded": 1122492,
+  "current_category": null,
+  "current_file_index": 0,
+  "total_files_processed": 3406,
+  "total_chunks_embedded": 1243029,
   "category_stats": {
     "pdf_PetaLinux": {
       "files": 0,
@@ -82,11 +83,11 @@
       "chunks": 91406
     },
     "code_Arty_7Series": {
-      "files": 15,
-      "chunks": 125509
+      "files": 25,
+      "chunks": 246046
     }
   },
-  "last_update": "2026-02-08T11:55:33.831109",
+  "last_update": "2026-02-09T01:15:23.253756",
   "status": "in_progress",
   "errors": []
 }
