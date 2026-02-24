@@ -79,14 +79,14 @@ class VertexEmbeddings:
 
 
 class GoogleGenAIEmbeddings:
-    """Embedding service using Google GenAI API (API key based)."""
+    """Embedding service using Google GenAI API (new google.genai package)."""
 
-    def __init__(self, api_key: str = None, model_name: str = "models/gemini-embedding-001"):
+    def __init__(self, api_key: str = None, model_name: str = "gemini-embedding-001"):
         """Initialize Google GenAI embeddings.
 
         Args:
             api_key: Google API key
-            model_name: Embedding model name
+            model_name: Embedding model name (e.g., gemini-embedding-exp-03-07, text-embedding-004)
         """
         self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
         self.model_name = model_name
@@ -96,45 +96,11 @@ class GoogleGenAIEmbeddings:
         """Lazy load the GenAI client."""
         if self._client is None:
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=self.api_key)
-                self._client = genai
+                from google import genai
+                self._client = genai.Client(api_key=self.api_key)
             except Exception as e:
                 raise RuntimeError(f"Google GenAI başlatılamadı: {e}")
         return self._client
-
-    def embed_text_rest(self, text: str) -> List[float]:
-        """Generate embedding using REST API (avoids grpc DNS issues).
-
-        Args:
-            text: Input text
-
-        Returns:
-            Embedding vector
-        """
-        import requests
-        import time
-        
-        url = f"https://generativelanguage.googleapis.com/v1beta/{self.model_name}:embedContent"
-        headers = {"Content-Type": "application/json"}
-        params = {"key": self.api_key}
-        data = {
-            "model": self.model_name,
-            "content": {"parts": [{"text": text}]}
-        }
-        
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                response = requests.post(url, headers=headers, params=params, json=data, timeout=30)
-                response.raise_for_status()
-                result = response.json()
-                return result["embedding"]["values"]
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    time.sleep(2 ** attempt)  # Exponential backoff
-                    continue
-                raise RuntimeError(f"REST API embedding hatası: {e}")
 
     def embed_text(self, text: str) -> List[float]:
         """Generate embedding for a single text.
@@ -145,18 +111,24 @@ class GoogleGenAIEmbeddings:
         Returns:
             Embedding vector
         """
-        # Try REST API first (more reliable with DNS issues)
-        try:
-            return self.embed_text_rest(text)
-        except Exception as rest_error:
-            print(f"  ⚠️ REST API başarısız, grpc deneniyor: {rest_error}")
-            # Fallback to grpc
-            client = self._get_client()
-            result = client.embed_content(
-                model=self.model_name,
-                content=text
-            )
-            return result["embedding"]
+        import time
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                client = self._get_client()
+                result = client.models.embed_content(
+                    model=self.model_name,
+                    contents=text
+                )
+                return list(result.embeddings[0].values)
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    print(f"  ⚠️ Embedding hatası, {wait_time}s bekleyip tekrar deneniyor: {e}")
+                    time.sleep(wait_time)
+                    continue
+                raise RuntimeError(f"Embedding oluşturulamadı: {e}")
 
     def embed_texts(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts.
@@ -167,12 +139,30 @@ class GoogleGenAIEmbeddings:
         Returns:
             List of embedding vectors
         """
+        import time
         embeddings = []
-        for i, text in enumerate(texts):
-            embedding = self.embed_text(text)
-            embeddings.append(embedding)
-            if (i + 1) % 10 == 0:
-                print(f"  📊 Vektörleştirme: {i + 1}/{len(texts)}")
+        batch_size = 100  # Process in batches
+        
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            try:
+                client = self._get_client()
+                result = client.models.embed_content(
+                    model=self.model_name,
+                    contents=batch
+                )
+                batch_embeddings = [list(e.values) for e in result.embeddings]
+                embeddings.extend(batch_embeddings)
+                print(f"  📊 Vektörleştirme: {min(i + batch_size, len(texts))}/{len(texts)}")
+            except Exception as e:
+                # Fallback to single text embedding if batch fails
+                print(f"  ⚠️ Batch embedding başarısız, tek tek deneniyor: {e}")
+                for j, text in enumerate(batch):
+                    embedding = self.embed_text(text)
+                    embeddings.append(embedding)
+                    if (i + j + 1) % 10 == 0:
+                        print(f"  📊 Vektörleştirme: {i + j + 1}/{len(texts)}")
+                    time.sleep(0.1)  # Rate limiting
         
         print(f"  📊 Vektörleştirme: {len(texts)}/{len(texts)} ✅")
         return embeddings

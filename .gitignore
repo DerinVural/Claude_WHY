@@ -68,12 +68,20 @@ service-account-key.json
 !training_organized_checkpoint.json
 !training_checkpoint.json
 
-# ChromaDB database (7GB+ too large for git)
+# ChromaDB database (too large for git)
 chroma_db/
+db/
 
 # PDF & Code data (too large for git)
 data/pdfs/
 data/code/
+
+# Windows venv backup
+.venv_windows_backup/
+
+# Evaluation outputs (auto-generated)
+evaluation_v2_20q.json
+evaluation_report.json
 
 # OS
 .DS_Store

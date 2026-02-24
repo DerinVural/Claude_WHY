@@ -20,9 +20,11 @@ class SentenceEmbeddings:
         """Lazy load the embedding model."""
         if self._model is None:
             try:
+                import torch
                 from sentence_transformers import SentenceTransformer
-                self._model = SentenceTransformer(self.model_name)
-                print(f"    [OK] Sentence Transformer modeli yüklendi: {self.model_name}")
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                self._model = SentenceTransformer(self.model_name, device=device)
+                print(f"    [OK] Sentence Transformer modeli yüklendi: {self.model_name} ({device})")
             except Exception as e:
                 raise RuntimeError(f"Sentence Transformers başlatılamadı: {e}")
         return self._model

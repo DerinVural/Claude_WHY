@@ -47,7 +47,7 @@ CODE_DIR = DATA_DIR / "code"
 # Hafif ayarlar - sistem donmasin
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
-EMBEDDING_BATCH_SIZE = 5  # Cok kucuk batch
+EMBEDDING_BATCH_SIZE = 256  # GPU ile buyuk batch
 FILES_PER_SAVE = 3  # Her 3 dosyada kaydet
 
 # Global verbose flag

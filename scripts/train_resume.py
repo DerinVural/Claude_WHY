@@ -150,11 +150,25 @@ def train_with_resume():
     
     code_loader = CodeLoader(str(code_dir))
     
-    # Tüm kod dosyalarını bul
+    # Tüm kod dosyalarını bul - os.walk ile tek geçiş (daha hızlı)
+    import os
     code_files = []
-    for ext in code_loader.SUPPORTED_EXTENSIONS.keys():
-        code_files.extend(code_loader.code_directory.glob(f"**/*{ext}"))
-    code_files = [f for f in code_files if not code_loader._should_ignore(f)]
+    supported_exts = set(code_loader.SUPPORTED_EXTENSIONS.keys())
+    
+    print("  🔍 Dosyalar taranıyor...")
+    file_count = 0
+    for root, dirs, files in os.walk(code_dir):
+        # .git ve benzeri klasörleri atla
+        dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['__pycache__', 'node_modules', '.git']]
+        for f in files:
+            ext = '.' + f.rsplit('.', 1)[-1] if '.' in f else ''
+            if ext in supported_exts:
+                full_path = Path(root) / f
+                if not code_loader._should_ignore(full_path):
+                    code_files.append(full_path)
+        file_count += len(files)
+        if file_count % 10000 == 0:
+            print(f"  📊 {file_count} dosya tarandı, {len(code_files)} kod dosyası bulundu...")
     
     print(f"📂 {len(code_files)} kod dosyası bulundu.")
     
@@ -253,7 +267,12 @@ def train_with_resume():
             ids = [f"doc_{i+j}" for j in range(len(batch))]
             metadatas = [c["metadata"] for c in batch]
             
-            vector_store.add_documents(ids, texts, vectors, metadatas)
+            vector_store.add_documents(
+                documents=texts,
+                embeddings=vectors,
+                ids=ids,
+                metadatas=metadatas
+            )
             
             # Checkpoint güncelle
             checkpoint["last_chunk_index"] = i + len(batch)

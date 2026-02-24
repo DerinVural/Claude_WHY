@@ -80,3 +80,8 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --cov=src --cov-report=html"
+markers = [
+    "unit: saf unit testler, gerçek DB gerektirmez",
+    "integration: gerçek db/ üzerinde tam pipeline testleri",
+    "smoke: hızlı sağlık kontrolü, CI/CD için",
+]

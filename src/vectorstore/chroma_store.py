@@ -82,6 +82,10 @@ class ChromaVectorStore:
             metadatas=metadatas or [{}] * len(documents),
         )
 
+    def count(self) -> int:
+        """Return the number of documents in the collection."""
+        return self.collection.count()
+
     def query(
         self,
         query_embedding: List[float],

@@ -52,7 +52,7 @@ class RAGChat:
         
         self.vector_store = ChromaVectorStore(
             persist_directory=chroma_dir,
-            collection_name="vivado_rag"
+            collection_name="documents"
         )
         self.embeddings = SentenceEmbeddings()
         self.generator = GeminiGenerator()
@@ -65,13 +65,35 @@ class RAGChat:
         
         print(f"✅ {doc_count} parça yüklendi.")
 
+    def _translate_to_english(self, text: str) -> str:
+        """Türkçe soruyu retrieval için İngilizce'ye çevir."""
+        try:
+            model = self.generator._get_model()
+            response = model.generate_content(
+                f"Translate this FPGA/electronics question to English. "
+                f"Keep all technical terms. Only output the translation, nothing else.\n\n{text}",
+                generation_config={"temperature": 0.0, "max_output_tokens": 256},
+            )
+            return response.text.strip()
+        except Exception:
+            return text  # Çeviri başarısızsa orijinal soruyu kullan
+
+    def _is_turkish(self, text: str) -> bool:
+        """Metnin Türkçe olup olmadığını kontrol et."""
+        turkish_chars = set("ğüşıöçĞÜŞİÖÇ")
+        turkish_words = {"nedir", "nasıl", "için", "ile", "bir", "olan", "hangi",
+                         "yapılır", "oluştur", "kullan", "ayarla", "konfigüre"}
+        has_turkish_char = any(c in turkish_chars for c in text)
+        has_turkish_word = any(w in text.lower().split() for w in turkish_words)
+        return has_turkish_char or has_turkish_word
+
     def ask(self, question: str, verbose: bool = True) -> dict:
         """Soru sor ve yanıt al.
-        
+
         Args:
             question: Kullanıcı sorusu
             verbose: Detaylı çıktı
-            
+
         Returns:
             Yanıt ve kaynaklar
         """
@@ -79,11 +101,20 @@ class RAGChat:
             print("\n" + "-" * 50)
             print(f"❓ Soru: {question}")
             print("-" * 50)
-        
-        # 1. Soruyu vektörleştir
+
+        # 1. Türkçe sorguyu retrieval için İngilizce'ye çevir
+        search_query = question
+        if self._is_turkish(question):
+            if verbose:
+                print("\n🌐 Türkçe algılandı, retrieval için İngilizce'ye çevriliyor...")
+            search_query = self._translate_to_english(question)
+            if verbose:
+                print(f"   🔄 Arama sorgusu: {search_query}")
+
+        # 2. Soruyu vektörleştir
         if verbose:
             print("\n🧮 Soru vektörleştiriliyor...")
-        query_embedding = self.embeddings.embed_text(question)
+        query_embedding = self.embeddings.embed_text(search_query)
         
         # 2. Benzer parçaları bul
         if verbose:

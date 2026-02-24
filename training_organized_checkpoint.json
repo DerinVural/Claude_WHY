@@ -15,12 +15,27 @@
     "pdf_Spartan_6",
     "pdf_CoolRunner",
     "pdf_Other_PDFs",
-    "code_Arty_7Series"
+    "code_Arty_7Series",
+    "code_Arty_Zynq",
+    "code_Basys",
+    "code_Nexys",
+    "code_Zybo",
+    "code_Cmod",
+    "code_Cora",
+    "code_Genesys",
+    "code_Eclypse",
+    "code_Zedboard",
+    "code_Vitis_Examples",
+    "code_Vivado_Tutorials",
+    "code_HDL_Libraries",
+    "code_PYNQ",
+    "code_Linux_BSP",
+    "code_Other_Code"
   ],
   "current_category": null,
   "current_file_index": 0,
-  "total_files_processed": 3406,
-  "total_chunks_embedded": 1243029,
+  "total_files_processed": 3592,
+  "total_chunks_embedded": 3802681,
   "category_stats": {
     "pdf_PetaLinux": {
       "files": 0,
@@ -85,9 +100,69 @@
     "code_Arty_7Series": {
       "files": 25,
       "chunks": 246046
+    },
+    "code_Arty_Zynq": {
+      "files": 17,
+      "chunks": 609467
+    },
+    "code_Basys": {
+      "files": 7,
+      "chunks": 5566
+    },
+    "code_Nexys": {
+      "files": 33,
+      "chunks": 44920
+    },
+    "code_Zybo": {
+      "files": 24,
+      "chunks": 304092
+    },
+    "code_Cmod": {
+      "files": 13,
+      "chunks": 3123
+    },
+    "code_Cora": {
+      "files": 13,
+      "chunks": 89008
+    },
+    "code_Genesys": {
+      "files": 6,
+      "chunks": 95009
+    },
+    "code_Eclypse": {
+      "files": 3,
+      "chunks": 51089
+    },
+    "code_Zedboard": {
+      "files": 7,
+      "chunks": 5428
+    },
+    "code_Vitis_Examples": {
+      "files": 10,
+      "chunks": 194470
+    },
+    "code_Vivado_Tutorials": {
+      "files": 4,
+      "chunks": 53315
+    },
+    "code_HDL_Libraries": {
+      "files": 6,
+      "chunks": 33949
+    },
+    "code_PYNQ": {
+      "files": 4,
+      "chunks": 22384
+    },
+    "code_Linux_BSP": {
+      "files": 2,
+      "chunks": 319676
+    },
+    "code_Other_Code": {
+      "files": 37,
+      "chunks": 728156
     }
   },
-  "last_update": "2026-02-09T01:15:23.253756",
-  "status": "in_progress",
+  "last_update": "2026-02-13T16:05:05.581437",
+  "status": "completed",
   "errors": []
 }
