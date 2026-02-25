@@ -1,0 +1,457 @@
+doc_id: RAG-TEST-001
+type: rag_validation
+scope: axi_gpio_example, nexys_a7_dma_audio
+created: 2026-02-24
+format: question_answer
+total_questions: 20
+---
+
+# RAG Sistemi Test Soruları
+
+> Her iki proje için 10'ar adet, proje kurgusu / sentez / debug / implementasyon odaklı sorular.
+> Cevaplar **yalnızca** proje kaynak dosyalarından türetilmiştir.
+
+---
+
+## Proje A — AXI GPIO Example (Nexys Video — xc7a200tsbg484-1)
+
+### A-Q01 · Clock Yapılandırması
+**Soru:** Bu projede saat sinyali karta nasıl giriyor, XDC'de hangi IOSTANDARD kullanılmış ve Clock Wizard'ın çıkışı nereye bağlanıyor?
+
+**Cevap:**  
+Saat, Nexys Video kartından **diferansiyel** olarak gelir:
+- `clk_100mhz_clk_p` → `R4`, `clk_100mhz_clk_n` → `T4`, IOSTANDARD = **LVDS**
+- `create_clock -period 10.000` → 100 MHz
+- Clock Wizard (`clk_wiz_1`) bu diferansiyel girişi alıp tek uçlu `clk_out1` üretir
+- `clk_out1` → `microblaze_0_Clk` olarak **tüm IP'lerin** saat girişine dağıtılır (MicroBlaze, AXI Interconnect, GPIO, Proc Sys Reset)
+- Clock Wizard'ın `reset` girişi `1'b0`'a bağlıdır — yani asla resetlenmez
+- `locked` sinyali → `rst_clk_wiz_1_100M` IP'sine `dcm_locked` olarak gider
+
+**Kaynak:** `nexys_video.xdc`, `synth/axi_gpio_bd.v` (clk_wiz_1, rst_clk_wiz_1_100M satırları)
+
+---
+
+### A-Q02 · GPIO IP Kanal ve Yön Konfigürasyonu
+**Soru:** AXI GPIO IP'si kaç kanal, kaç bit genişlikte ve hangi yönde (giriş/çıkış) yapılandırılmış? Bu ayarlar BD dosyasının neresinde tanımlı?
+
+**Cevap:**  
+BD JSON dosyasında `axi_gpio_0` bloğunun `parameters` bölümü:
+
+| Parametre | Değer | Anlam |
+|-----------|-------|-------|
+| `C_IS_DUAL` | `0` | **Tek kanal** (Channel 1 only) |
+| `C_GPIO_WIDTH` | `8` | **8 bit** genişlik |
+| `C_ALL_OUTPUTS` | `1` | **Yalnızca çıkış** (output-only) |
+
+Sentez netlist'inde yalnızca `gpio_io_o(led_8bits_tri_o)` portu bağlıdır — `gpio_io_i` veya `gpio_io_t` portu yoktur. Top-level wrapper'da `led_8bits_tri_o[7:0]` olarak dışarı çıkar.
+
+**Kaynak:** `axi_gpio_bd.bd` (L456–462), `synth/axi_gpio_bd.v` (axi_gpio_0 instance)
+
+---
+
+### A-Q03 · Adres Haritası ve BRAM Boyutlandırma
+**Soru:** MicroBlaze'in adres haritasında GPIO ve BRAM hangi adreslerde, hangi boyutlarda yer alıyor? Yazılım geliştiricisi GPIO register'larına hangi adresten erişmeli?
+
+**Cevap:**  
+
+| Segment | Base Offset | Range | Space |
+|---------|------------|-------|-------|
+| AXI GPIO (`SEG_axi_gpio_0_Reg`) | **`0x40000000`** | **64 KB** | Data |
+| DLMB BRAM (data) | `0x00000000` | 32 KB | Data |
+| ILMB BRAM (instruction) | `0x00000000` | 32 KB | Instruction |
+
+- GPIO Data Register: `0x40000000` (8-bit LED çıkışı yazmak için)
+- GPIO Tri-State Register: `0x40000004` (ama `C_ALL_OUTPUTS=1` olduğu için bu register etkisiz)
+- DLMB ve ILMB aynı 32 KB BRAM'ı paylaşır (Local Memory subsystem)
+
+**Kaynak:** `axi_gpio_bd.bd` (addressing bölümü, L720–765)
+
+---
+
+### A-Q04 · Reset Topolojisi
+**Soru:** Sistemin reset zincirleri nasıl çalışıyor? Harici reset'ten MicroBlaze'e kadar sinyal yolu nedir?
+
+**Cevap:**  
+Reset zinciri 3 katmandan oluşur:
+
+1. **Harici giriş:** `reset` butonu → G4 pini, LVCMOS15
+2. **Proc Sys Reset** (`rst_clk_wiz_1_100M`):
+   - `ext_reset_in` ← harici `reset` butonu
+   - `dcm_locked` ← Clock Wizard `locked` sinyali
+   - `mb_debug_sys_rst` ← MDM debug reset
+   - `aux_reset_in` ← `1'b1` (daima deasserted)
+3. **Çıkışlar:**
+   - `mb_reset` → MicroBlaze `Reset` girişi
+   - `peripheral_aresetn` → AXI Interconnect ve AXI GPIO `s_axi_aresetn` (active-low)
+   - `bus_struct_reset` → Local Memory subsystem `SYS_Rst`
+
+**Dikkat:** Clock Wizard kilitlenmeden (`locked=0`) MicroBlaze ve periferaller reset'te kalır — bu doğru bir davranıştır.
+
+**Kaynak:** `synth/axi_gpio_bd.v` (rst_clk_wiz_1_100M instance, L240–250)
+
+---
+
+### A-Q05 · AXI Interconnect Yapısı
+**Soru:** AXI Interconnect kaç master ve kaç slave portuna sahip? MicroBlaze'den GPIO'ya veri yolu nasıl oluşuyor?
+
+**Cevap:**  
+- Interconnect: `microblaze_0_axi_periph` — `NUM_MI = 1` (tek master arayüz çıkışı)
+- Topoloji: **1×1** (1 slave giriş, 1 master çıkış)
+  - `S00_AXI` ← MicroBlaze `M_AXI_DP` (Data Peripheral) portu
+  - `M00_AXI` → `axi_gpio_0` `S_AXI` portu
+- Tüm clock'lar aynı: `ACLK = S00_ACLK = M00_ACLK = microblaze_0_Clk`
+- Tüm reset'ler aynı: `ARESETN = S00_ARESETN = M00_ARESETN = peripheral_aresetn`
+- AXI adresleme: GPIO `s_axi_araddr` ve `s_axi_awaddr` sadece `[8:0]` bit bağlanmış (64 KB aralık yeterli)
+
+**Kaynak:** `axi_gpio_bd.bd` (L467–480, microblaze_0_axi_periph), `synth/axi_gpio_bd.v`
+
+---
+
+### A-Q06 · LED IOSTANDARD Seçimi
+**Soru:** LED'ler için neden LVCMOS25 seçilmiş? Bu Nexys Video kartı için doğru mu? Switch pinleri neden farklı bir IOSTANDARD kullanıyor?
+
+**Cevap:**  
+Nexys Video kartında I/O banklarına göre voltaj atanır:
+- **LED'ler** (T14–Y13): Bank 14/15, VCCO = 2.5V → **LVCMOS25** ✓ doğru
+- **Switch'ler** (E22–M17, sadece simple variant'ta): Bank 34/35, VCCO = 1.2V → **LVCMOS12** ✓ doğru
+- **Reset** butonu (G4): Bank 35, VCCO = 1.5V → **LVCMOS15** ✓ doğru
+
+**Hata:** `vivado_axi_simple` variant'ında clock pini R4 **LVCMOS33** olarak tanımlanmış — bu yanlıştır. Nexys Video'da clock diferansiyeldir ve **LVDS** olmalıdır (ana BD projesinde doğru yapılmış).
+
+**Kaynak:** `nexys_video.xdc` (her iki variant), Nexys Video schematic referansı
+
+---
+
+### A-Q07 · Standalone Wrapper Neden Çalışmaz?
+**Soru:** `vivado_axi_simple/axi_gpio_wrapper.v` dosyası AXI GPIO'yu switch ve LED'lere bağlıyor gibi görünüyor. Bu tasarım sentezlenip çalıştırılabilir mi?
+
+**Cevap:**  
+**Hayır, çalışamaz.** Tüm AXI sinyalleri sabit değerlere bağlanmış (tie-off):
+- `s_axi_awaddr = 32'h0`, `s_axi_awvalid = 1'b0` → Yazma isteği asla gönderilmez
+- `s_axi_araddr = 32'h0`, `s_axi_arvalid = 1'b0` → Okuma isteği asla gönderilmez
+- `s_axi_wdata = 32'h0`, `s_axi_wvalid = 1'b0` → Veri asla yazılmaz
+
+GPIO IP bir AXI slave'dir — bir master (MicroBlaze, Zynq PS, vb.) olmadan register'larına erişilemez. `gpio_io_i(switches)` bağlansa bile, AXI üzerinden okuma yapılamadığı için switch değerleri okunamaz. `gpio_io_o(leds)` her zaman `0x00` kalır.
+
+**Bu dosya bir prototip/şablon olarak değerlendirilmelidir.**
+
+**Kaynak:** `vivado_axi_simple/axi_gpio_wrapper.v`
+
+---
+
+### A-Q08 · MicroBlaze Debug ve JTAG
+**Soru:** MicroBlaze Debug Module (MDM) tasarımda hangi rolleri üstleniyor? Debug reset sinyali sistemi nasıl etkiler?
+
+**Cevap:**  
+MDM (`mdm_1`) iki temel işlev sağlar:
+1. **JTAG Debug:** Vivado Hardware Manager üzerinden MicroBlaze'e breakpoint, step, memory read/write yapılabilir
+   - `Dbg_Capture_0`, `Dbg_Shift_0`, `Dbg_TDI_0`, `Dbg_TDO_0`, `Dbg_Update_0` → JTAG zinciri
+   - `Dbg_Clk_0` → debug clock
+   - `Dbg_Reg_En_0` → debug register enable
+2. **System Reset:** `Debug_SYS_Rst` çıkışı → `rst_clk_wiz_1_100M.mb_debug_sys_rst` girişi
+   - Vivado'dan "Reset MicroBlaze" komutu verildiğinde bu sinyal aktif olur
+   - Proc Sys Reset IP'si bunu alır ve `mb_reset` + `bus_struct_reset` üretir
+   - Yani JTAG üzerinden **tüm sistem** resetlenebilir
+
+**Kaynak:** `synth/axi_gpio_bd.v` (mdm_1 instance, rst_clk_wiz_1_100M bağlantıları)
+
+---
+
+### A-Q09 · Sentez Uyarıları ve Optimizasyon
+**Soru:** Bu projeyi sentezlerken `KEEP_HIERARCHY` pragma'sı nerede kullanılmış ve ne amaçla? BMM_INFO_PROCESSOR ne anlama geliyor?
+
+**Cevap:**  
+Sentez netlist'inde MicroBlaze instance'ında iki pragma vardır:
+
+```verilog
+(* BMM_INFO_PROCESSOR = "microblaze-le > axi_gpio_bd microblaze_0_local_memory/dlmb_bram_if_cntlr" *)
+(* KEEP_HIERARCHY = "yes" *)
+```
+
+- **`KEEP_HIERARCHY = "yes"`**: Sentez aracının MicroBlaze modülünü flatten etmesini (düzleştirmesini) engeller. Debug ve bitstream güncelleme için hiyerarşi korunmalıdır.
+- **`BMM_INFO_PROCESSOR`**: Bitstream'e ELF (yazılım) yükleme sırasında `data2mem` aracına BRAM eşlemesini bildirir.
+  - `microblaze-le` → Little-endian MicroBlaze
+  - `dlmb_bram_if_cntlr` → yazılımın yükleneceği BRAM controller'ı
+  - Bu sayede `updatemem` komutuyla bitstream'e .elf gömülebilir.
+
+**Kaynak:** `synth/axi_gpio_bd.v` (microblaze_0 instance, L160–163)
+
+---
+
+### A-Q10 · Timing Constraint Analizi
+**Soru:** Projede sadece bir `create_clock` tanımlı. Clock Wizard çıkışı için ayrıca timing constraint gerekir mi? False path veya multicycle path tanımı var mı?
+
+**Cevap:**  
+- `create_clock -period 10.000 -name sys_clk [get_ports clk_100mhz_clk_p]` → 100 MHz giriş clock'u
+- **Clock Wizard çıkışı için ek constraint gerekmez** — Vivado, MMCM/PLL çıkışları için `auto-derived clock` oluşturur. `clk_out1` otomatik olarak 100 MHz constraint alır.
+- **False path tanımı yok** — ama gerekli de değildir çünkü:
+  - Tüm IP'ler aynı clock domain'de (`microblaze_0_Clk`)
+  - Tek clock domain = CDC (Clock Domain Crossing) yok
+  - Reset sinyali senkronize edilmiş (Proc Sys Reset IP bunu yapar)
+- **Multicycle path tanımı yok** — MicroBlaze pipeline'ı kendi içinde yönetir
+
+**Potansiyel iyileştirme:** `set_false_path -from [get_ports reset]` eklenebilir — çünkü reset butonu asenkron bir giriştir (Proc Sys Reset senkronize etse de, araç uyarı verebilir).
+
+**Kaynak:** `nexys_video.xdc`, `synth/axi_gpio_bd.v` (tek clock domain doğrulaması)
+
+---
+---
+
+## Proje B — Nexys A7 DMA Audio (xc7a50ticsg324-1L)
+
+### B-Q01 · Veri Yolu Genişlik Kaybı
+**Soru:** DMA'dan çıkan 32-bit veri, PWM çıkışına ulaşana kadar hangi aşamalardan geçiyor ve her aşamada kaç bit kaybediliyor?
+
+**Cevap:**  
+Veri yolu daraltma zinciri:
+
+| Aşama | Giriş | Çıkış | Kayıp | Modül |
+|-------|-------|-------|-------|-------|
+| AXI DMA → AXI-Stream | 32 bit | 32 bit | — | AXI DMA IP |
+| AXI-Stream → FIFO | 32 bit | **16 bit** | 16 bit | `axis2fifo.v` (`axis_tdata[15:0]`) |
+| FIFO → PWM | 32 bit (4×8) | **8 bit** | — | `fifo2audpwm.v` (byte unpack) |
+
+- **İlk kayıp (32→16):** `axis2fifo.v` Line: `assign fifo_wr_data = axis_tdata[15:0]` — üst 16 bit atılır
+- **İkinci dönüşüm (16→8×2→8):** FIFO 32-bit genişliğinde. İki adet 16-bit kelime birleşip 32-bit olarak okunur. `fifo2audpwm` bunu 4 adet 8-bit `duty[]` sample'a ayırır
+- **Efektif çözünürlük: 8 bit** — orijinal 32-bit verinin sadece alt 8 bit'i anlamlı
+
+**Kaynak:** `axis2fifo.v` (L33), `fifo2audpwm.v` (L28–32)
+
+---
+
+### B-Q02 · PWM Sayacı ve Örnekleme Zamanlaması
+**Soru:** `fifo2audpwm` modülünde `count` register'ı kaç bit genişliğinde, neden `DATA_WIDTH+2` bit kullanılıyor ve bu PWM frekansını nasıl belirliyor?
+
+**Cevap:**  
+- `count` genişliği: `DATA_WIDTH + 2 = 10 bit` (DATA_WIDTH=8 default)
+- 10 bit'in anlamı:
+  - **Alt 8 bit** (`count[7:0]`): PWM karşılaştırma sayacı → 256 seviye
+  - **Üst 2 bit** (`count[9:8]`): 4 sample arasında seçim → `duty[count[9:8]]`
+- Bir tam PWM periyodu: $2^{10} = 1024$ clock cycle
+- FIFO'dan yeni 32-bit kelime okunma koşulu: `&count == 1'b1` → count = 1023 (tüm bitler 1)
+- **Her 1024 cycle'da:**
+  - 1 adet 32-bit FIFO kelimesi okunur
+  - 4 adet 8-bit sample'a ayrılır
+  - Her 256 cycle'da bir sample PWM olarak çıkar
+- PWM frekansı: $f_{clk} / 1024$ (100 MHz'de ≈ 97.6 kHz)
+
+**Kaynak:** `fifo2audpwm.v` (L19: count tanımı, L21: fifo_rd_en, L37: pwm karşılaştırma)
+
+---
+
+### B-Q03 · Phase Increment Hesaplama
+**Soru:** Tone generator'da `INCREMENT = 32'h00B22D0E` değeri nasıl hesaplanmış? Bu değeri farklı bir frekans için nasıl değiştiririm?
+
+**Cevap:**  
+DDS (Direct Digital Synthesis) formülü:
+
+$$\text{INCREMENT} = \frac{f_{tone}}{f_{sample}} \times 2^{N}$$
+
+Burada:
+- $f_{tone} = 261$ Hz (Middle C)
+- $f_{sample} = 96000$ Hz
+- $N = 32$ (accumulator derinliği)
+
+$$\text{INCREMENT} = \frac{261}{96000} \times 2^{32} = \frac{261 \times 4294967296}{96000} = 11_672_846 = \texttt{0x00B22D0E}$$
+
+**Farklı frekans için:** Örneğin La notası (440 Hz):
+
+$$\text{INCREMENT}_{440} = \frac{440}{96000} \times 2^{32} = 19_691_107 = \texttt{0x012C9BA3}$$
+
+**Not:** Bu parametre şu anda HDL'de `localparam` olarak sabit kodlanmış. Modülün TODO yorumunda AXI arayüzü ile runtime ayarlama planlanmış ama henüz yapılmamış.
+
+**Kaynak:** `tone_generator.v` (L28–29: INCREMENT tanımı, L72: TODO yorumu)
+
+---
+
+### B-Q04 · FIFO Boyutlandırma ve Buffer Süresi
+**Soru:** Async FIFO'nun boyutu ne kadar ve bu kaç saniyelik ses verisine karşılık geliyor? Buffer underrun ne zaman yaşanır?
+
+**Cevap:**  
+- FIFO derinliği: **4096 kelime × 32 bit** (FIFO Generator IP)
+- Her 32-bit kelime = 4 adet 8-bit sample
+- Toplam sample kapasitesi: $4096 \times 4 = 16{,}384$ sample
+- Buffer süresi: $\frac{16{,}384}{96{,}000} \approx 0.171$ saniye (**~170 ms**)
+
+**Buffer underrun koşulları:**
+- `fifo_empty == 1` olduğunda `fifo2audpwm` yeni veri okuyamaz
+- `aud_en <= 0` yapılır → SSM2377 amplifikatör shutdown moduna geçer (ses kesilir)
+- DMA transferi FIFO'yu doldurmaktan daha yavaş olursa (özellikle DDR2 erişim gecikmesi sırasında)
+
+**Async FIFO nedeni:** DMA tarafı MIG `ui_clk` (~81.25 MHz) domain'inde, PWM tarafı `clk_wiz_0_clk_out1` (100 MHz veya 24.576 MHz) domain'inde çalışır → CDC gerekli.
+
+**Kaynak:** README.md (FIFO spesifikasyonları), `fifo2audpwm.v` (L23–34: empty kontrolü)
+
+---
+
+### B-Q05 · DMA Transfer Modu
+**Soru:** AXI DMA IP'si Scatter-Gather mi yoksa Direct Register modunda mı çalışıyor? SDK'da DMA transferi nasıl başlatılıyor?
+
+**Cevap:**  
+**Direct Register (Simple DMA) modu** — Scatter-Gather devre dışı.
+
+SDK'da transfer akışı (`main.c`):
+1. `XAxiDma_CfgInitialize(&dma, ...)` — DMA başlatma
+2. `dma_send(src_addr, length)`:
+   - `Xil_DCacheFlushRange(src_addr, length)` — cache flush
+   - `XAxiDma_SimpleTransfer(&dma, src_addr, length, XAXIDMA_DMA_TO_DEVICE)` — MM2S transfer başlat
+   - Polling: `while (XAxiDma_Busy(&dma, XAXIDMA_DMA_TO_DEVICE))` — transfer tamamlanana kadar bekle
+3. Buffer boyutu: `BUFFER_SIZE = 128` byte per transfer
+4. **Interrupt kullanılmıyor** — tamamen polling tabanlı
+
+**Sınırlamalar:**
+- Her seferinde max 128 byte transfer (32 sample)
+- Polling loop CPU'yu bloke eder
+- Sürekli ses akışı için yazılım döngüsü gerekir
+
+**Kaynak:** `main.c` (L65: BUFFER_SIZE, L85–88: dma_send prototipi), README.md
+
+---
+
+### B-Q06 · Clock Domain'ler ve Crossing
+**Soru:** Projede kaç farklı clock domain var? Clock domain crossing (CDC) nerede ve nasıl çözülmüş?
+
+**Cevap:**  
+**3 clock domain:**
+
+| Domain | Frekans | Kaynak | Kullanan |
+|--------|---------|--------|----------|
+| `clk_wiz_0_clk_out1` | 100 MHz | Clock Wizard | MicroBlaze, AXI periferaller, tone_generator, axis2fifo |
+| `ui_clk` | ~81.25 MHz | MIG DDR2 controller | AXI DMA ↔ MIG arası |
+| `clk_out2` (varsa) | 24.576 MHz | Clock Wizard | Audio sample clock (opsiyonel) |
+
+**CDC çözümü:**
+- MIG ↔ AXI DMA arası: MIG IP kendi içinde AXI clock domain crossing yapar (AXI Smart Interconnect)
+- AXI-Stream → PWM arası: **Async FIFO Generator** IP'si (4096×32) — write clock: MicroBlaze domain, read clock: PWM domain
+- FIFO'nun `wr_clk` ve `rd_clk` portları farklı clock'lara bağlıdır
+
+**Dikkat:** `axis2fifo.v`'nin `CLK_DOMAIN` parametresi `clk_wiz_0_clk_out1` olarak işaretlenmiş — bu write tarafı içindir.
+
+**Kaynak:** `axis2fifo.v` (CLK_DOMAIN parametresi), README.md (clock bilgileri)
+
+---
+
+### B-Q07 · Bellek Haritası ve Peripheral Adresleri
+**Soru:** SDK yazılımında kullanılan tüm peripheral base adreslerini listeleyin. DDR2'de ses verisi hangi offset'ten başlıyor?
+
+**Cevap:**  
+
+| Peripheral | Base Address | Kullanım |
+|------------|-------------|----------|
+| GPIO_IN | `0x40000000` | Buton okuma (5 buton + switch) |
+| GPIO_OUT | `0x40010000` | LED yazma |
+| UART Lite | `0x40600000` | WAV dosya alma (230400 baud) |
+| Interrupt Controller | `0x41200000` | Interrupt yönetimi (kullanılmıyor) |
+| AXI DMA | `0x41E00000` | DMA control/status register'ları |
+| DDR2 (MIG) | `0x80000000` | Ham DDR2 başlangıcı |
+| **Ses buffer** | **`0x81000000`** | `DDR_BASE + 0x01000000` — gerçek ses verisi |
+
+- DDR2 toplam: 128 MB (`0x80000000` → `0x87FFFFFF`)
+- İlk 16 MB (`0x80000000` → `0x80FFFFFF`) MicroBlaze stack/heap için ayrılmış
+- `MAX_WAV_SIZE = 0x7FFFFF` (~8.4 MB) — ses verisi `MEM_BASE_ADDR`'den itibaren saklanır
+
+**Kaynak:** `main.c` (L58–59: DDR_BASE_ADDR, MEM_BASE_ADDR), README.md (peripheral tablosu)
+
+---
+
+### B-Q08 · axis2fifo Back-Pressure Mekanizması
+**Soru:** FIFO dolduğunda AXI-Stream tarafında ne oluyor? `axis2fifo` modülü back-pressure'ı nasıl yönetiyor? Veri kaybı olabilir mi?
+
+**Cevap:**  
+Back-pressure tamamen kombinasyonel (sıfır gecikme):
+
+```
+assign axis_tready = ~fifo_full;     // FIFO doluysa tready=0
+assign fifo_wr_en  = axis_tready & axis_tvalid;  // Her iki taraf da hazırsa yaz
+assign fifo_wr_data = axis_tdata[15:0];           // 32→16 bit truncation
+```
+
+**Akış:**
+1. FIFO dolu → `fifo_full = 1` → `axis_tready = 0`
+2. DMA (AXI-Stream master) `tready=0` görünce veri göndermeyi durdurur (AXI-Stream handshake)
+3. DMA kendi iç buffer'ında veriyi tutar
+4. FIFO'dan `fifo2audpwm` okudukça yer açılır → `fifo_full = 0` → akış devam eder
+
+**Veri kaybı senaryosu:**
+- Normal çalışmada kayıp yoktur (AXI-Stream protokolü bunu garanti eder)
+- Ancak `axis_tdata[31:16]` her zaman atılır — bu bir tasarım kararıdır, back-pressure değil
+
+**Dikkat:** `axis_tkeep` ve `axis_tlast` sinyalleri `axis2fifo`'da bağlı ama kullanılmıyor (sadece port eşleştirmesi var).
+
+**Kaynak:** `axis2fifo.v` (L30–33: kombinasyonel assign'lar)
+
+---
+
+### B-Q09 · XDC Constraint Stratejisi
+**Soru:** Master XDC dosyasında neden sadece 2 pin (PWM çıkışları) aktif? Projeyi genişletmek istesem (örn. LED debug eklemek) ne yapmalıyım?
+
+**Cevap:**  
+Aktif olan tek constraint'ler:
+```xdc
+set_property -dict { PACKAGE_PIN A11 IOSTANDARD LVCMOS33 } [get_ports { PWM_AUDIO_0_pwm }];  # aud_pwm
+set_property -dict { PACKAGE_PIN D12 IOSTANDARD LVCMOS33 } [get_ports { PWM_AUDIO_0_en }];   # aud_sd
+```
+
+**Neden sadece 2 pin?**
+- Clock, reset, DDR2, UART pinleri **BD'deki IP'ler tarafından otomatik yönetilir** (MIG, Clock Wizard, UART Lite kendi LOC constraint'lerini IP-level XDC'de taşır)
+- Sadece **custom RTL** portları (`pwm_audio_rtl` interface) manual constraint gerektirir
+- Port isimleri `PWM_AUDIO_0_*` — BD'den otomatik üretilen isimlerdir
+
+**LED debug eklemek için:**
+1. BD'ye AXI GPIO IP ekle (8-bit output)
+2. Master XDC'den LED satırlarını uncomment et:
+   ```xdc
+   set_property -dict { PACKAGE_PIN H17 IOSTANDARD LVCMOS33 } [get_ports { led[0] }]
+   ```
+3. Port isimlerini BD'deki GPIO port ismiyle eşleştir
+4. `xparameters.h`'de yeni GPIO base adresini kontrol et
+
+**Kaynak:** `Nexys-A7-100T-Master.xdc` (yorum satırları dahil tüm pin tanımları mevcut)
+
+---
+
+### B-Q10 · Demo Modları ve Buton Eşlemesi
+**Soru:** SDK yazılımında kaç çalışma modu var, her mod hangi butona atanmış ve varsayılan mod hangisi? Hangi modlar gerçekten çalışıyor?
+
+**Cevap:**  
+
+| Define | Değer | Buton | Durum |
+|--------|-------|-------|-------|
+| `DEMO_MODE_PAUSED` | `0x01` | Center | ✅ Çalışır — ses durur |
+| `DEMO_MODE_HW_TONE_GEN` | `0x02` | Up | ❌ **DISABLED** — HW tone gen bağlı değil |
+| `DEMO_MODE_RECV_WAV_FILE` | `0x04` | Left | ⚠️ Kısmen — UART ile WAV alır ama header doğrulamaz |
+| `DEMO_MODE_PLAY_WAV_FILE` | `0x08` | Right | ❌ **STUB** — fonksiyon gövdesi tamamlanmamış |
+| `DEMO_MODE_SW_TONE_GEN` | `0x10` | Down | ✅ Çalışır — 261 Hz yazılım ton üretimi |
+
+- **Varsayılan mod:** `DEMO_MODE_SW_TONE_GEN` (`0x10`) — kart açılınca doğrudan 261 Hz ton çalar
+- **GPIO_IN** (`0x40000000`): 5 buton durumunu okur, bitmask ile mod seçimi yapılır
+- **Çalışan akış:** SW Tone Gen → `dma_sw_tone_gen()` → 128-byte buffer'a sawtooth doldur → `dma_send()` → DDR2 → DMA → FIFO → PWM
+
+**Kaynak:** `main.c` (L51–55: define'lar, L79: varsayılan mod, L95: main döngüsü)
+
+---
+
+## Soru Zorluk Matrisi
+
+| ID | Konu | Zorluk | Kategori |
+|----|------|--------|----------|
+| A-Q01 | Clock yapılandırması | Orta | Kurgu |
+| A-Q02 | GPIO konfigürasyon | Kolay | Kurgu |
+| A-Q03 | Adres haritası | Orta | Yazılım |
+| A-Q04 | Reset topolojisi | Zor | Debug |
+| A-Q05 | AXI Interconnect | Orta | Kurgu |
+| A-Q06 | IOSTANDARD seçimi | Orta | Sentez |
+| A-Q07 | Standalone analiz | Zor | Debug |
+| A-Q08 | MDM & JTAG | Zor | Debug |
+| A-Q09 | Sentez pragma'ları | Zor | Sentez |
+| A-Q10 | Timing constraint | Zor | Sentez |
+| B-Q01 | Veri genişlik kaybı | Orta | Kurgu |
+| B-Q02 | PWM sayacı | Zor | RTL Analiz |
+| B-Q03 | Phase increment | Orta | RTL Analiz |
+| B-Q04 | FIFO boyutlandırma | Orta | Kurgu |
+| B-Q05 | DMA transfer modu | Kolay | Yazılım |
+| B-Q06 | Clock domain | Zor | Sentez |
+| B-Q07 | Bellek haritası | Kolay | Yazılım |
+| B-Q08 | Back-pressure | Zor | RTL Analiz |
+| B-Q09 | XDC stratejisi | Orta | Sentez |
+| B-Q10 | Demo modları | Kolay | Yazılım |

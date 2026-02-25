@@ -1,0 +1,618 @@
+{
+  "timestamp": "2026-02-25T09:58:17.666743",
+  "avg_score": 0.8772619047619047,
+  "grade": "A",
+  "results": [
+    {
+      "id": "C-Q01",
+      "series": "C-Serisi",
+      "category": "Linker Script / Bellek Layout",
+      "domain": "SDK Build",
+      "difficulty": "Orta",
+      "score": 1.0,
+      "grade": "A",
+      "confidence": "HIGH",
+      "term_hits": [
+        "lscript.ld",
+        "BRAM",
+        "DDR2",
+        "stack",
+        "heap",
+        "microblaze"
+      ],
+      "term_misses": [],
+      "value_hits": [
+        "0x80000000",
+        "0x00000000"
+      ],
+      "value_misses": [],
+      "file_hits": [
+        "helloworld.c"
+      ],
+      "file_misses": [],
+      "elapsed_s": 29.94,
+      "answer_preview": "# DMA Audio Projesinde Bellek Bölümlendirmesi\n\n## Cevap: Sistemde Linker Script Bilgisi Bulunamadı\n\n**Kritik Uyarı:** Context'te `lscript.ld` dosyasının içeriği veya bellek segmentasyon detayları **bulunmamaktadır**. Aşağıda mevcut bilgiler ve boşluklar açıklanmıştır.\n\n---\n\n## Mevcut Bellek Mimarisi"
+    },
+    {
+      "id": "C-Q02",
+      "series": "C-Serisi",
+      "category": "Yazılım Bug Analizi",
+      "domain": "Hata Senaryosu",
+      "difficulty": "Zor",
+      "score": 1.0,
+      "grade": "A",
+      "confidence": "HIGH",
+      "term_hits": [
+        "XAxiDma_Busy",
+        "polling",
+        "timeout",
+        "sonsuz döngü",
+        "watchdog",
+        "busy"
+      ],
+      "term_misses": [],
+      "value_hits": [],
+      "value_misses": [],
+      "file_hits": [
+        "helloworld.c"
+      ],
+      "file_misses": [],
+      "elapsed_s": 17.98,
+      "answer_preview": "# DMA Polling Döngülerinde Timeout Mekanizması Analizi\n\n## Sonuç: **TIMEOUT MEKANIZMASI YOK — Sonsuz Döngü Riski VAR**\n\n---\n\n## 1. Sorunlu Kod Lokasyonları\n\n### **Bug #1: `dma_receive()` — S2MM Kanal Polling**\n**Dosya:** `helloworld.c:120-145` (dma_receive fonksiyonu)\n\n```c\nu32 busy = 0;\ndo {\n    bu"
+    },
+    {
+      "id": "C-Q03",
+      "series": "C-Serisi",
+      "category": "Timeout / Sonsuz Döngü",
+      "domain": "Hata Senaryosu",
+      "difficulty": "Zor",
+      "score": 0.7999999999999999,
+      "grade": "B",
+      "confidence": "MEDIUM",
+      "term_hits": [
+        "XUartLite_Recv",
+        "XAxiDma_Reset",
+        "timeout"
+      ],
+      "term_misses": [
+        "watchdog",
+        "blocking"
+      ],
+      "value_hits": [],
+      "value_misses": [],
+      "file_hits": [
+        "helloworld.c"
+      ],
+      "file_misses": [],
+      "elapsed_s": 14.19,
+      "answer_preview": "# UART ve DMA Polling Bloklanması Analizi\n\n## 1. Tespit Edilen Bloklanma Riskleri\n\n### A. UART Receive Bloklanması\n**Kaynak:** `helloworld.c:249-256` (uart_recv)\n\n```c\nu32 uart_recv (Demo *p_demo_inst, u8 *buffer, int length) {\n\tu32 received_count = 0;\n\twhile (received_count < length) {  // ⚠️ SONSU"
+    },
+    {
+      "id": "C-Q04",
+      "series": "C-Serisi",
+      "category": "IP Versiyon Kataloğu",
+      "domain": "Kurgu",
+      "difficulty": "Orta",
+      "score": 0.85,
+      "grade": "A",
+      "confidence": "HIGH",
+      "term_hits": [
+        "clk_wiz",
+        "proc_sys_reset",
+        "axi_gpio",
+        "microblaze",
+        "versiyon",
+        "v6",
+        "v5",
+        "v2"
+      ],
+      "term_misses": [],
+      "value_hits": [],
+      "value_misses": [],
+      "file_hits": [],
+      "file_misses": [
+        "create_minimal_microblaze.tcl",
+        "add_axi_gpio.tcl"
+      ],
+      "elapsed_s": 10.73,
+      "answer_preview": "# axi_gpio_example Projesinde Kullanılan IP Blokları ve Sürüm Bilgileri\n\n## IP Blokları ve Sürüm Numaraları\n\nAşağıdaki bilgiler **EVID-B-ipcat-001** (IP Versiyon Kataloğu) kaynağından alınmıştır:\n\n| IP Bloğu | VLNV | Sürüm | Açıklama |\n|----------|------|-------|---------|\n| **Clocking Wizard** | `x"
+    },
+    {
+      "id": "C-Q05",
+      "series": "C-Serisi",
+      "category": "MIG DDR2 Kalibrasyon",
+      "domain": "MIG / DDR2",
+      "difficulty": "Zor",
+      "score": 1.0,
+      "grade": "A",
+      "confidence": "HIGH",
+      "term_hits": [
+        "mig_7series_0",
+        "ui_clk",
+        "init_calib_complete",
+        "DDR2",
+        "kalibrasyon",
+        "calib"
+      ],
+      "term_misses": [],
+      "value_hits": [
+        "81.25",
+        "81"
+      ],
+      "value_misses": [],
+      "file_hits": [
+        "design_1.tcl"
+      ],
+      "file_misses": [],
+      "elapsed_s": 17.61,
+      "answer_preview": "# Nexys A7 DMA Audio — MIG 7-Series DDR2 Kalibrasyon & Clock Domain Analizi\n\n## 1. MIG Kalibrasyon Süreci\n\n### Genel Akış\n**COMP-A-mig_7series_0** (Xilinx MIG 7-Series DDR2 Controller) kalibrasyon süreci şu adımları izler:\n\n1. **Sistem Reset → MIG Init Başlangıcı**\n   - `proc_sys_reset` (COMP-A-rst_"
+    },
+    {
+      "id": "C-Q06",
+      "series": "C-Serisi",
+      "category": "Bitstream + ELF Gömme",
+      "domain": "Bitstream",
+      "difficulty": "Zor",
+      "score": 0.7785714285714285,
+      "grade": "B",
+      "confidence": "MEDIUM",
+      "term_hits": [
+        "updatemem",
+        "bitstream",
+        "elf",
+        "BMM",
+        "mmi",
+        "BRAM"
+      ],
+      "term_misses": [
+        "write_bitstream"
+      ],
+      "value_hits": [],
+      "value_misses": [],
+      "file_hits": [],
+      "file_misses": [
+        "design_1.tcl"
+      ],
+      "elapsed_s": 19.56,
+      "answer_preview": "# Nexys A7 DMA Audio: MicroBlaze Firmware Bitstream'e Gömme\n\n## Kısa Cevap\nVerilen context'te **updatemem komutu parametreleri, .mmi dosyası detayları ve BMM_INFO_PROCESSOR pragma'sı hakkında doğrudan bilgi bulunmamaktadır**. Sistem mimarisinden çıkarılabilecek bilgiler aşağıdadır.\n\n---\n\n## 1. Siste"
+    },
+    {
+      "id": "C-Q07",
+      "series": "C-Serisi",
+      "category": "Testbench Tasarımı",
+      "domain": "Simülasyon",
+      "difficulty": "Zor",
+      "score": 0.9285714285714285,
+      "grade": "A",
+      "confidence": "MEDIUM",
+      "term_hits": [
+        "testbench",
+        "fifo_empty",
+        "aud_pwm",
+        "DATA_WIDTH",
+        "duty",
+        "count"
+      ],
+      "term_misses": [
+        "simülasyon"
+      ],
+      "value_hits": [
+        "8"
+      ],
+      "value_misses": [],
+      "file_hits": [
+        "fifo2audpwm.v"
+      ],
+      "file_misses": [],
+      "elapsed_s": 15.97,
+      "answer_preview": "# fifo2audpwm Modülü için Verilog Testbench Tasarımı\n\n## 1. Modül Mimarisi Özeti\n\n**Kaynak:** `fifo2audpwm.v` (satır 1-39)\n\n`fifo2audpwm` modülü şu mantığı uygular:\n\n| Parametre | Değer | Açıklama |\n|-----------|-------|----------|\n| `DATA_WIDTH` | 8 | PWM counter genişliği (0-255) |\n| `FIFO_DATA_WI"
+    },
+    {
+      "id": "C-Q08",
+      "series": "C-Serisi",
+      "category": "Utilization Tahmini",
+      "domain": "Implementasyon",
+      "difficulty": "Orta",
+      "score": 0.8571428571428571,
+      "grade": "A",
+      "confidence": "MEDIUM",
+      "term_hits": [
+        "LUT",
+        "FF",
+        "BRAM",
+        "xc7a200t",
+        "kaynak"
+      ],
+      "term_misses": [
+        "utilization",
+        "resource"
+      ],
+      "value_hits": [],
+      "value_misses": [],
+      "file_hits": [
+        "SYNTHESIS_RESULTS.md"
+      ],
+      "file_misses": [],
+      "elapsed_s": 15.47,
+      "answer_preview": "# AXI GPIO Example Projesi — Kaynak Kullanımı Tahmini\n\n## 📊 Sentez Sonuçları (SYNTHESIS_RESULTS.md'den)\n\nVerilen context'teki **Nexys Video üzerindeki MicroBlaze + AXI GPIO sistemi** için doğrulanmış kaynak kullanımı:\n\n| **Bileşen** | **LUTs** | **FFs** | **BRAMs** | **Kaynak** |\n|---|---|---|---|--"
+    },
+    {
+      "id": "C-Q09",
+      "series": "C-Serisi",
+      "category": "WAV Dosya İşleme",
+      "domain": "Yazılım",
+      "difficulty": "Orta",
+      "score": 0.8250000000000001,
+      "grade": "A",
+      "confidence": "MEDIUM",
+      "term_hits": [
+        "recv_wav",
+        "RIFF",
+        "WAV",
+        "MAX_WAV_SIZE",
+        "header",
+        "parse"
+      ],
+      "term_misses": [],
+      "value_hits": [
+        "0x7FFFFF"
+      ],
+      "value_misses": [
+        "8388607"
+      ],
+      "file_hits": [
+        "helloworld.c"
+      ],
+      "file_misses": [],
+      "elapsed_s": 14.23,
+      "answer_preview": "# WAV Dosyası İşleme Analizi (helloworld.c)\n\n## recv_wav() Fonksiyonunun İşleyişi\n\n`recv_wav()` fonksiyonu (satır 297-345) aşağıdaki adımları izler:\n\n### 1. **Bellek Ayırma ve Maksimum Boyut**\n\n```c\nconst u32 max_file_size = 0x7FFFFF; // 16.777 MB\nu8 *file = malloc(max_file_size);\n```\n\n**MAX_WAV_SIZ"
+    },
+    {
+      "id": "C-Q10",
+      "series": "C-Serisi",
+      "category": "DRC / Critical Warning",
+      "domain": "Hata Senaryosu",
+      "difficulty": "Zor",
+      "score": 0.7785714285714285,
+      "grade": "B",
+      "confidence": "MEDIUM",
+      "term_hits": [
+        "DRC",
+        "NSTD-1",
+        "CFGBVS",
+        "TIMING",
+        "set_property",
+        "CONFIG_VOLTAGE"
+      ],
+      "term_misses": [
+        "critical warning"
+      ],
+      "value_hits": [],
+      "value_misses": [],
+      "file_hits": [],
+      "file_misses": [
+        "nexys_video.xdc"
+      ],
+      "elapsed_s": 18.74,
+      "answer_preview": "# axi_gpio_example Vivado DRC Hataları ve Kritik Uyarılar\n\n## 1. DRC Hataları — Ne Zaman Tetiklenir?\n\n### NSTD-1 (IOSTANDARD Tanımsız)\n**Tetikleme Koşulu:**\n- I/O pinlerine IOSTANDARD özelliği atanmamışsa\n- XDC dosyasında `set_property IOSTANDARD` satırı eksikse\n\n**Proje Bağlamında:**\nContext'te `cr"
+    },
+    {
+      "id": "E-Q01",
+      "series": "E-Serisi",
+      "category": "Port Listesinden Tasarım Çıkarma",
+      "domain": "Kurgu",
+      "difficulty": "Zor",
+      "score": 0.8333333333333334,
+      "grade": "A",
+      "confidence": "HIGH",
+      "term_hits": [
+        "LVDS",
+        "diferansiyel",
+        "GPIO",
+        "MicroBlaze"
+      ],
+      "term_misses": [
+        "clk_wiz",
+        "proc_sys_reset"
+      ],
+      "value_hits": [
+        "R4",
+        "T4"
+      ],
+      "value_misses": [],
+      "file_hits": [
+        "nexys_video.xdc",
+        "axi_gpio_wrapper.v"
+      ],
+      "file_misses": [],
+      "elapsed_s": 12.69,
+      "answer_preview": "# Top-Level Wrapper Port Analizi\n\nVerilen port listesinden tasarımın mimarisi ve gerekli IP'leri aşağıdaki şekilde çıkarabiliriz:\n\n---\n\n## 1. Clock Tipi: Diferansiyel LVDS\n\n**Port:** `clk_100mhz_clk_p` + `clk_100mhz_clk_n`\n\n- **Tip:** Diferansiyel LVDS clock (pozitif + negatif ayaklar)\n- **Frekans:*"
+    },
+    {
+      "id": "E-Q02",
+      "series": "E-Serisi",
+      "category": "440 Hz INCREMENT Hesabı",
+      "domain": "RTL Analiz",
+      "difficulty": "Orta",
+      "score": 0.7416666666666667,
+      "grade": "B",
+      "confidence": "HIGH",
+      "term_hits": [
+        "INCREMENT",
+        "DDS",
+        "ACCUMULATOR_DEPTH",
+        "AUD_SAMPLE_FREQ",
+        "440"
+      ],
+      "term_misses": [
+        "19685267"
+      ],
+      "value_hits": [
+        "0x012C5F93"
+      ],
+      "value_misses": [
+        "19685267"
+      ],
+      "file_hits": [
+        "tone_generator.v"
+      ],
+      "file_misses": [],
+      "elapsed_s": 6.55,
+      "answer_preview": "# 440 Hz için DDS INCREMENT Hesaplaması\n\n## Sonuç\n**440 Hz (La notası) için INCREMENT değeri:**\n- **Decimal:** 19,685,267\n- **Hexadecimal:** 0x012C5F93\n\n---\n\n## Hesaplama Detayı\n\n### Formül (EVID-A-dds-calc-001'den)\n```\nINCREMENT = (frekans_hz × 2^ACCUMULATOR_DEPTH) / AUD_SAMPLE_FREQ\n```\n\n### Parame"
+    },
+    {
+      "id": "E-Q03",
+      "series": "E-Serisi",
+      "category": "FIFO Empty Debug",
+      "domain": "Debug",
+      "difficulty": "Zor",
+      "score": 1.0,
+      "grade": "A",
+      "confidence": "HIGH",
+      "term_hits": [
+        "fifo_empty",
+        "fifo_rd_en",
+        "aud_en",
+        "aud_pwm",
+        "duty",
+        "count"
+      ],
+      "term_misses": [],
+      "value_hits": [],
+      "value_misses": [],
+      "file_hits": [
+        "fifo2audpwm.v"
+      ],
+      "file_misses": [],
+      "elapsed_s": 15.0,
+      "answer_preview": "# fifo2audpwm Modülünde FIFO Boşalma Sinyal Zinciri Analizi\n\n## Adım Adım Sinyal İlerleyişi (`fifo_empty=1` durumu)\n\n### **1. FIFO Boşalma Koşulu Tespiti**\n```verilog\nassign fifo_rd_en = (fifo_empty == 0 && &count == 1'b1);\n```\n**Kaynak:** fifo2audpwm.v, satır 23\n\n- `fifo_empty = 1` olduğunda: `fifo"
+    },
+    {
+      "id": "E-Q04",
+      "series": "E-Serisi",
+      "category": "Adres Çakışması Analizi",
+      "domain": "Yazılım",
+      "difficulty": "Orta",
+      "score": 0.825,
+      "grade": "A",
+      "confidence": "MEDIUM",
+      "term_hits": [
+        "0x40000000",
+        "GPIO_IN",
+        "adres haritası",
+        "segment"
+      ],
+      "term_misses": [
+        "SEG_axi_gpio_0"
+      ],
+      "value_hits": [
+        "0x40000000",
+        "64 KB"
+      ],
+      "value_misses": [],
+      "file_hits": [
+        "design_1.tcl"
+      ],
+      "file_misses": [
+        "add_axi_gpio.tcl"
+      ],
+      "elapsed_s": 17.85,
+      "answer_preview": "# AXI GPIO Base Adres Analizi: Proje Karşılaştırması\n\n## Kısa Cevap\n**Hayır, aynı fiziksel register'a erişmiyorlar.** Her proje kendi bağımsız donanım tasarımına (design) sahip olduğu için, aynı base adres (`0x40000000`) farklı fiziksel GPIO IP'lerine işaret eder. **Farklı projelerde aynı base adres"
+    },
+    {
+      "id": "E-Q05",
+      "series": "E-Serisi",
+      "category": "Ses Kesintisi Root Cause",
+      "domain": "Debug",
+      "difficulty": "Zor",
+      "score": 1.0,
+      "grade": "A",
+      "confidence": "HIGH",
+      "term_hits": [
+        "polling",
+        "buffer",
+        "double buffering",
+        "interrupt",
+        "underrun",
+        "BUFFER_SIZE"
+      ],
+      "term_misses": [],
+      "value_hits": [
+        "128"
+      ],
+      "value_misses": [],
+      "file_hits": [
+        "helloworld.c"
+      ],
+      "file_misses": [],
+      "elapsed_s": 19.57,
+      "answer_preview": "# DMA Polling Tabanlı Ses Kesintisi Analizi\n\n## 1. Sorunun Kökü: Polling Modu vs. Interrupt Modu\n\n### Context'ten Kanıtlar:\n\n**COMP-A-axi_dma_0** (HIGH confidence):\n> \"Simple (Direct Register) modu — c_include_sg=0 (Scatter-Gather KAPALI). MM2S kanalı: DDR2 → AXI-Stream. SDK XAxiDma_SimpleTransfer()"
+    },
+    {
+      "id": "E-Q06",
+      "series": "E-Serisi",
+      "category": "Constraint Çatışması Tespiti",
+      "domain": "Sentez",
+      "difficulty": "Orta",
+      "score": 0.9249999999999999,
+      "grade": "A",
+      "confidence": "HIGH",
+      "term_hits": [
+        "LVCMOS33",
+        "LVDS",
+        "BIVC-1",
+        "DRC",
+        "banka voltajı",
+        "diferansiyel",
+        "constraint"
+      ],
+      "term_misses": [],
+      "value_hits": [
+        "R4",
+        "1.8V",
+        "3.3V"
+      ],
+      "value_misses": [],
+      "file_hits": [
+        "nexys_video.xdc"
+      ],
+      "file_misses": [
+        "axi_gpio_wrapper.v"
+      ],
+      "elapsed_s": 18.01,
+      "answer_preview": "# Nexys Video R4 Pini IOSTANDARD Uyumsuzluğu Analizi\n\n## Sorun Özeti\n\n**Context'ten alınan gerçek veriler:**\n\n| Kaynak | Bilgi |\n|--------|-------|\n| **nexys_video.xdc (satır 4)** | `set_property -dict { PACKAGE_PIN R4 IOSTANDARD LVCMOS33 }` |\n| **create_axi_auto.tcl (satır 115)** | `set_property -d"
+    },
+    {
+      "id": "E-Q07",
+      "series": "E-Serisi",
+      "category": "32→8 Bit Veri Bütünlüğü",
+      "domain": "RTL Analiz",
+      "difficulty": "Zor",
+      "score": 0.7857142857142857,
+      "grade": "B",
+      "confidence": "HIGH",
+      "term_hits": [
+        "tdata",
+        "fifo_rd_data",
+        "16",
+        "axis2fifo"
+      ],
+      "term_misses": [
+        "axis_tdata",
+        "truncation",
+        "bit loss"
+      ],
+      "value_hits": [
+        "31:16",
+        "15:0",
+        "7:0"
+      ],
+      "value_misses": [],
+      "file_hits": [
+        "axis2fifo.v",
+        "fifo2audpwm.v",
+        "helloworld.c"
+      ],
+      "file_misses": [],
+      "elapsed_s": 18.64,
+      "answer_preview": "# Ses Zincirinde Bit Kaybı Analizi\n\n## Sorunun Özeti\nYazılım → DMA → FIFO → Audio PWM zincirinde **veri genişliği uyumsuzluğu** var. Hangi bitler kayboluyor ve nerede?\n\n---\n\n## 1. Yazılım Katmanı: 8-bit → 32-bit Paketleme\n\n**Kaynak:** `helloworld.c:200-228` (dma_sw_tone_gen)\n\n```c\nfor (u32 i=0; i<bu"
+    },
+    {
+      "id": "E-Q08",
+      "series": "E-Serisi",
+      "category": "Polling'den Interrupt'a Geçiş",
+      "domain": "Yazılım",
+      "difficulty": "Zor",
+      "score": 0.8416666666666666,
+      "grade": "A",
+      "confidence": "HIGH",
+      "term_hits": [
+        "XAxiDma_IntrGetIrq",
+        "XAxiDma_IntrAckIrq",
+        "interrupt",
+        "xlconcat",
+        "0x41200000"
+      ],
+      "term_misses": [
+        "XIntc_Initialize"
+      ],
+      "value_hits": [],
+      "value_misses": [],
+      "file_hits": [
+        "helloworld.c"
+      ],
+      "file_misses": [
+        "design_1.tcl"
+      ],
+      "elapsed_s": 13.42,
+      "answer_preview": "# DMA Audio Projesinde Polling → Interrupt Tabanlı Geçiş\n\n## Mevcut Durum Analizi\n\n**Sistemde hazır olan bileşenler** (context'ten):\n- `xlconcat_0` (COMP-A-xlconcat_0): DMA mm2s_introut + s2mm_introut sinyallerini AXI INTC'ye bağlıyor\n- `microblaze_0_axi_intc` (COMP-A-microblaze_0_axi_intc): v4.1, D"
+    },
+    {
+      "id": "E-Q09",
+      "series": "E-Serisi",
+      "category": "AXI Bus Topoloji Karşılaştırma",
+      "domain": "Kurgu",
+      "difficulty": "Orta",
+      "score": 0.9249999999999999,
+      "grade": "A",
+      "confidence": "MEDIUM",
+      "term_hits": [
+        "1×1",
+        "1×5",
+        "AXI-Stream",
+        "microblaze_0_axi_periph",
+        "axi_interconnect_0",
+        "DDR2",
+        "master",
+        "slave"
+      ],
+      "term_misses": [],
+      "value_hits": [],
+      "value_misses": [],
+      "file_hits": [
+        "design_1.tcl"
+      ],
+      "file_misses": [
+        "add_axi_gpio.tcl"
+      ],
+      "elapsed_s": 13.63,
+      "answer_preview": "# AXI Bus Topolojisi Karşılaştırması\n\n## Sistemdeki Projeler\nContext'te **2 proje** bulunmaktadır:\n1. **PROJECT-A**: Nexys-A7-100T-DMA-Audio\n2. **PROJECT-B**: axi_example\n\n---\n\n## DMA Audio Projesinin AXI Topolojisi\n\n### AXI Master Sayısı: **2**\nKaynak: `design_1.tcl` (address segment tanımları)\n- *"
+    },
+    {
+      "id": "E-Q10",
+      "series": "E-Serisi",
+      "category": "Sentez Öncesi Checklist",
+      "domain": "Sentez",
+      "difficulty": "Orta",
+      "score": 0.85,
+      "grade": "A",
+      "confidence": "MEDIUM",
+      "term_hits": [
+        "checklist",
+        "clock",
+        "reset",
+        "adres",
+        "AXI",
+        "GPIO",
+        "timing",
+        "TCL"
+      ],
+      "term_misses": [],
+      "value_hits": [],
+      "value_misses": [],
+      "file_hits": [],
+      "file_misses": [
+        "create_minimal_microblaze.tcl",
+        "nexys_video.xdc"
+      ],
+      "elapsed_s": 17.2,
+      "answer_preview": "# axi_gpio_example Projesi — Synthesis Öncesi 8-Maddelik Checklist\n\n## 1. ✅ Clock Kaynağı\n\n**Durum: DOĞRULANMIŞ**\n\n- **Clock Wizard (clk_wiz_0):** 100 MHz diferansiyel LVDS giriş → single-ended çıkış\n- **Çıkış:** `clk_out1` → tüm modüllere dağıtılır\n- **Bağlantı:** `clk_wiz_0/clk_out1` → `microblaze"
+    }
+  ],
+  "target_categories": {
+    "Bitstream": 0.7785714285714285,
+    "Simülasyon": 0.9285714285714285,
+    "Implementasyon": 0.8571428571428571,
+    "Hata Senaryosu": 0.8595238095238095
+  }
+}

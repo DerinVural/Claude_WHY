@@ -1,0 +1,2255 @@
+{
+  "meta": {
+    "pipeline_version": "2.0",
+    "generated_at": "2026-02-23T00:00:00Z",
+    "architecture_ref": "fpga_rag_architecture_v2.md",
+    "ister_doc_ref": "FPGA_RAG_ISTER_DOKUMANI_v2.txt",
+    "projects": ["PROJECT-A", "PROJECT-B"],
+    "phases_completed": [1, 2, 3, 4, 5, 6]
+  },
+
+  "nodes": [
+
+    // ============================================================
+    // PHASE 1+2: PROJECT & SOURCE_DOC NODES
+    // ============================================================
+    {
+      "node_id": "PROJECT-A",
+      "node_type": "PROJECT",
+      "name": "Nexys-A7-100T-DMA-Audio",
+      "description": "Digilent Nexys A7-100T üzerinde DMA tabanlı ses akışı demo uygulaması",
+      "board": "Digilent Nexys A7-100T",
+      "fpga_part_intended": "xc7a100tcsg324-1",
+      "fpga_part_actual_tcl": "xc7a50ticsg324-1L",
+      "tool": "Vivado 2018.2 + Xilinx SDK",
+      "developer": "Digilent",
+      "language": ["Verilog", "C"],
+      "project_type": "application",
+      "root_requirement": "DMA-REQ-L0-001",
+      "version": 1,
+      "last_updated": "2026-02-23",
+      "confidence": "HIGH",
+      "provenance": { "phase": 1, "source": "project_info.tcl + README.md + design_1.tcl" },
+      "issue_refs": ["ISSUE-A-001"]
+    },
+    {
+      "node_id": "PROJECT-B",
+      "node_type": "PROJECT",
+      "name": "axi_example",
+      "description": "AXI bus mimarisi eğitim / validasyon test suite",
+      "board": "Digilent Nexys Video",
+      "fpga_part_intended": "xc7a200tsbg484-1",
+      "fpga_part_actual_tcl": "xc7a200tsbg484-1",
+      "tool": "Vivado 2025.1",
+      "developer": "In-house",
+      "language": ["Verilog"],
+      "project_type": "educational",
+      "root_requirement": "AXI-REQ-L0-001",
+      "version": 1,
+      "last_updated": "2026-02-23",
+      "confidence": "HIGH",
+      "provenance": { "phase": 1, "source": "README.md + utilization_summary.txt + nexys_video.xdc" }
+    },
+
+    // ============================================================
+    // PHASE 2: COMPONENT NODES — PROJECT-A
+    // ============================================================
+    {
+      "node_id": "COMP-A-axis2fifo_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "axis2fifo_0",
+      "component_type": "RTL_Module",
+      "source_file": "src/hdl/axis2fifo.v",
+      "source_doc": "SDOC-A-001",
+      "lines": 37,
+      "ports": {
+        "inputs": ["clk", "axis_tdata[31:0]", "axis_tkeep[0]", "axis_tlast", "axis_tvalid", "fifo_full"],
+        "outputs": ["axis_tready", "fifo_wr_data[15:0]", "fifo_wr_en"]
+      },
+      "parameters": {},
+      "key_logic": [
+        "axis_tready = ~fifo_full  (backpressure, line 33)",
+        "fifo_wr_en = axis_tready & axis_tvalid  (line 34)",
+        "fifo_wr_data = axis_tdata[15:0]  (16-bit truncation, line 35)"
+      ],
+      "clock_domain": "MIG ui_clk (~81 MHz)",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "src/hdl/axis2fifo.v direct parse" }
+    },
+    {
+      "node_id": "COMP-A-fifo2audpwm_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "fifo2audpwm_0",
+      "component_type": "RTL_Module",
+      "source_file": "src/hdl/fifo2audpwm.v",
+      "source_doc": "SDOC-A-002",
+      "lines": 39,
+      "ports": {
+        "inputs": ["clk", "fifo_rd_data[31:0]", "fifo_empty"],
+        "outputs": ["aud_pwm", "aud_en", "fifo_rd_en"]
+      },
+      "parameters": { "DATA_WIDTH": 8, "FIFO_DATA_WIDTH": 32 },
+      "key_logic": [
+        "256-level PWM counter (DATA_WIDTH+2 bits)",
+        "4 samples packed per 32-bit FIFO word (lines 29-32)",
+        "aud_en = 0 when fifo_empty (lines 23-26)",
+        "fifo_rd_en triggered at counter overflow (line 23)"
+      ],
+      "clock_domain": "clk_wiz_0 Clk_Out2 (24.576 MHz)",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "src/hdl/fifo2audpwm.v direct parse" }
+    },
+    {
+      "node_id": "COMP-A-tone_generator_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "tone_generator_0",
+      "component_type": "RTL_Module",
+      "source_file": "src/hdl/tone_generator.v",
+      "source_doc": "SDOC-A-003",
+      "lines": 73,
+      "ports": {
+        "inputs": ["clk", "axis_tready"],
+        "outputs": ["axis_tdata[31:0]", "axis_tvalid", "axis_tlast", "axis_tkeep[3:0]"]
+      },
+      "parameters": {
+        "INCREMENT": "0x00B22D0E",
+        "TONE_FREQ": 261,
+        "AUD_SAMPLE_FREQ": 96000,
+        "PACKET_SIZE": 256,
+        "ACCUMULATOR_DEPTH": 32
+      },
+      "key_logic": [
+        "axis_tvalid = 1 (constant, line 52) — backpressure only via tready",
+        "axis_tlast = 1'b1 (CONSTANT 1, line 69) — BUG: no packet framing",
+        "phase accumulator: duty += INCREMENT on each valid transfer",
+        "output: {16'b0, duty[31:16]} — 16-bit audio in 32-bit word",
+        "TODO comment line 72: 'create AXI interface for configuration'"
+      ],
+      "clock_domain": "MIG ui_clk (~81 MHz)",
+      "parse_flags": ["PARSE_UNCERTAIN_WHY_DISABLED"],
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "src/hdl/tone_generator.v direct parse" }
+    },
+    {
+      "node_id": "COMP-A-fifo_generator_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "fifo_generator_0",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:fifo_generator:13.2",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": {
+        "mode": "independent_clocks",
+        "FIFO_DEPTH": 4096,
+        "DATA_WIDTH": 32
+      },
+      "key_connections": {
+        "wr_clk": "MIG ui_clk (~81 MHz)",
+        "rd_clk": "clk_wiz_0 Clk_Out2 (24.576 MHz)",
+        "din": "axis2fifo_0.fifo_wr_data",
+        "dout": "fifo2audpwm_0.fifo_rd_data",
+        "full": "axis2fifo_0.fifo_full",
+        "empty": "fifo2audpwm_0.fifo_empty"
+      },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl fifo_generator config" }
+    },
+    {
+      "node_id": "COMP-A-axi_dma_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "axi_dma_0",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:axi_dma:7.1",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": {
+        "c_include_sg": 0,
+        "c_sg_include_stscntrl_strm": 0,
+        "burst_size": 256,
+        "addr_width": 27
+      },
+      "key_connections": {
+        "M_AXIS_MM2S": "axis2fifo_0 (via AXI-Stream)",
+        "S_AXIS_S2MM": "tone_generator_0 (via AXI-Stream)",
+        "M_AXI_MM2S": "axi_interconnect_0",
+        "M_AXI_S2MM": "axi_interconnect_0",
+        "mm2s_introut": "xlconcat_0.In0",
+        "s2mm_introut": "xlconcat_0.In1"
+      },
+      "clock_domain": "MIG ui_clk (~81 MHz)",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl IP check list + connections" }
+    },
+    {
+      "node_id": "COMP-A-mig_7series_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "mig_7series_0",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:mig_7series:4.1",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": { "memory_type": "DDR2", "base_address": "0x80000000", "size_MB": 128 },
+      "key_outputs": ["ui_clk (~81 MHz)", "ui_clk_sync_rst", "mmcm_locked", "init_calib_complete"],
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl MIG configuration" }
+    },
+    {
+      "node_id": "COMP-A-clk_wiz_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "clk_wiz_0",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:clk_wiz:6.0",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": {
+        "CLKOUT1_FREQ_HZ": 140625000,
+        "CLKOUT2_FREQ_HZ": 24576000,
+        "CLKIN_FREQ_HZ": 100000000
+      },
+      "key_connections": {
+        "clk_out1": "mig_7series_0/sys_clk_i",
+        "clk_out2": "fifo2audpwm_0/clk + fifo_generator_0/rd_clk"
+      },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl + DMA-REQ-L2-008 constraints" }
+    },
+    {
+      "node_id": "COMP-A-rst_mig_7series_0_81M",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "rst_mig_7series_0_81M",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:proc_sys_reset:5.0",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "key_connections": {
+        "slowest_sync_clk": "MIG ui_clk",
+        "ext_reset_in": "mig_7series_0/ui_clk_sync_rst",
+        "dcm_locked": "mig_7series_0/mmcm_locked",
+        "peripheral_aresetn": "all AXI peripherals",
+        "interconnect_aresetn": "AXI Interconnects"
+      },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl proc_sys_reset connections" }
+    },
+    {
+      "node_id": "COMP-A-microblaze_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "microblaze_0",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:microblaze:10.0",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": { "C_USE_ICACHE": 1, "C_USE_DCACHE": 1 },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl IP list" }
+    },
+    {
+      "node_id": "COMP-A-mdm_1",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "mdm_1",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:mdm:3.2",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": { "C_MB_DBG_PORTS": 1 },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl IP list" }
+    },
+    {
+      "node_id": "COMP-A-microblaze_0_axi_intc",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "microblaze_0_axi_intc",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:axi_intc:4.1",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": { "base_address": "0x41200000" },
+      "note": "Installed but software uses polling — ISSUE-A-006",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl IP list" }
+    },
+    {
+      "node_id": "COMP-A-xlconcat_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "xlconcat_0",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:xlconcat:2.1",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "key_connections": {
+        "In0": "axi_dma_0/mm2s_introut",
+        "In1": "axi_dma_0/s2mm_introut"
+      },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl DMA-REQ-L1-006 constraints" }
+    },
+    {
+      "node_id": "COMP-A-xlconcat_1",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "xlconcat_1",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:xlconcat:2.1",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "key_connections": {
+        "In0": "GPIO_IN/ip2intc_irpt",
+        "In1": "GPIO_OUT/ip2intc_irpt",
+        "In2": "axi_uartlite_0/interrupt"
+      },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "DMA-REQ-L1-006 constraints" }
+    },
+    {
+      "node_id": "COMP-A-GPIO_IN",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "GPIO_IN",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:axi_gpio:2.0",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": {
+        "C_GPIO_WIDTH": 5,
+        "C_GPIO2_WIDTH": 16,
+        "C_IS_DUAL": 1,
+        "base_address": "0x40000000"
+      },
+      "key_connections": {
+        "CH1_input": "5 buttons",
+        "CH2_input": "16 switches",
+        "ip2intc_irpt": "xlconcat_1/In0"
+      },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl + DMA-REQ-L2-006 constraints" }
+    },
+    {
+      "node_id": "COMP-A-GPIO_OUT",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "GPIO_OUT",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:axi_gpio:2.0",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": {
+        "C_ALL_OUTPUTS": 1,
+        "C_IS_DUAL": 1,
+        "base_address": "0x40010000"
+      },
+      "key_connections": {
+        "CH1_output": "RGB LEDs",
+        "CH2_output": "16 LEDs",
+        "ip2intc_irpt": "xlconcat_1/In1"
+      },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl + DMA-REQ-L2-006 constraints" }
+    },
+    {
+      "node_id": "COMP-A-axi_uartlite_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "axi_uartlite_0",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:axi_uartlite:2.0",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": { "C_BAUDRATE": 230400, "base_address": "0x40600000" },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl IP list" }
+    },
+    {
+      "node_id": "COMP-A-helloworld",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "helloworld",
+      "component_type": "SW_Application",
+      "source_file": "sdk/appsrc/helloworld.c",
+      "source_doc": "SDOC-A-004",
+      "lines": 395,
+      "key_functions": [
+        "main() — demo mode state machine",
+        "dma_sw_tone_gen() — software 261 Hz tone generation (lines 353-380)",
+        "recv_wav() — UART WAV reception + DDR2 storage",
+        "play_wav() — DMA MM2S playback",
+        "init_dma() — DMA simple mode initialization (explicitly rejects SG mode, line 50)"
+      ],
+      "language": "C",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "sdk/appsrc/helloworld.c direct parse" }
+    },
+    {
+      "node_id": "COMP-A-axi_interconnect_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "axi_interconnect_0",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:axi_interconnect",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": { "NUM_SI": 4, "NUM_MI": 1 },
+      "note": "Memory-side interconnect: DMA MM2S + DMA S2MM + MB DC + MB IC → MIG",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "DMA-REQ-L1-001 constraints" }
+    },
+    {
+      "node_id": "COMP-A-microblaze_0_axi_periph",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "microblaze_0_axi_periph",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:axi_interconnect",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": { "NUM_SI": 1, "NUM_MI": 5 },
+      "note": "Peripheral-side interconnect: MB → GPIO_IN, GPIO_OUT, UART, DMA, INTC",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl" }
+    },
+    {
+      "node_id": "COMP-A-lmb_bram",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "lmb_bram (lmb_bram_if_cntlr + lmb_v10 + blk_mem_gen)",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:lmb_bram_if_cntlr:4.0",
+      "source_file": "design_1.tcl",
+      "source_doc": "SDOC-A-005",
+      "parameters": { "size_KB": 64 },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl IP list" }
+    },
+    {
+      "node_id": "COMP-A-pwm_audio_bus",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-A",
+      "name": "PWM_AUDIO custom bus",
+      "component_type": "Custom_Interface",
+      "source_file": "repo/local/if/pwm_audio/pwm_audio_rtl.xml",
+      "source_doc": "SDOC-A-009",
+      "ports": ["pwm (out)", "en (out)", "gain (out)"],
+      "note": "Digilent custom bus interface definition for SSM2377 audio amplifier",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "pwm_audio_rtl.xml" }
+    },
+
+    // ============================================================
+    // PHASE 2: COMPONENT NODES — PROJECT-B
+    // ============================================================
+    {
+      "node_id": "COMP-B-axi_gpio_wrapper",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-B",
+      "name": "axi_gpio_wrapper",
+      "component_type": "RTL_Module",
+      "source_file": "vivado_axi_simple/axi_gpio_wrapper.v",
+      "source_doc": "SDOC-B-001",
+      "lines": 37,
+      "ports": {
+        "inputs": ["clk", "resetn", "switches[7:0]"],
+        "outputs": ["leds[7:0]"]
+      },
+      "key_logic": [
+        "AXI tie-off pattern: awvalid=0, arvalid=0, wvalid=0 (lines 18-20)",
+        "Slave accept: bready=1, rready=1 (lines 22,28)",
+        "GPIO: gpio_io_i=switches, gpio_io_o=leds (lines 31-32)"
+      ],
+      "educational_pattern": "AXI slave tie-off",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "vivado_axi_simple/axi_gpio_wrapper.v direct parse" }
+    },
+    {
+      "node_id": "COMP-B-simple_top",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-B",
+      "name": "simple_top",
+      "component_type": "RTL_Module",
+      "source_file": "simple_working/simple_project.srcs/sources_1/new/simple_top.v",
+      "source_doc": "SDOC-B-002",
+      "lines": 12,
+      "ports": {
+        "inputs": ["clk", "reset"],
+        "outputs": ["led[3:0]"]
+      },
+      "key_logic": ["4-bit synchronous counter", "synchronous reset"],
+      "educational_pattern": "Toolchain validation counter",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "SDOC-B-002 description" }
+    },
+    {
+      "node_id": "COMP-B-axi_gpio_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-B",
+      "name": "axi_gpio_0",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:axi_gpio:2.0",
+      "source_file": "axi_gpio_bd.bd / create_minimal_microblaze.tcl",
+      "source_doc": "SDOC-B-003, SDOC-B-006",
+      "parameters": { "C_GPIO_WIDTH": 8, "C_ALL_OUTPUTS": 1, "base_address": "0x40000000" },
+      "confirmed_synthesis": true,
+      "synthesis_evidence": "utilization_summary.txt: microblaze_bd_axi_gpio_0_0 instance verified",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "utilization_summary.txt + add_axi_gpio.tcl" }
+    },
+    {
+      "node_id": "COMP-B-microblaze_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-B",
+      "name": "microblaze_0",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:microblaze:11.0",
+      "source_file": "create_minimal_microblaze.tcl",
+      "source_doc": "SDOC-B-006",
+      "parameters": {
+        "C_USE_ICACHE": 0,
+        "C_USE_DCACHE": 0,
+        "C_D_AXI": 1,
+        "debug_enabled": true
+      },
+      "synthesis_lut_estimate": 1000,
+      "confirmed_synthesis": true,
+      "synthesis_evidence": "utilization_summary.txt: microblaze_bd_microblaze_0_0 instance verified",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "utilization_summary.txt + SYNTHESIS_RESULTS.md" }
+    },
+    {
+      "node_id": "COMP-B-microblaze_0_axi_periph",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-B",
+      "name": "microblaze_0_axi_periph",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:axi_interconnect:2.1",
+      "source_file": "add_axi_gpio.tcl",
+      "source_doc": "SDOC-B-007",
+      "parameters": { "NUM_SI": 1, "NUM_MI": 1, "protocol": "AXI4-Lite" },
+      "key_connections": {
+        "S00_AXI": "microblaze_0/M_AXI_DP",
+        "M00_AXI": "axi_gpio_0/s_axi"
+      },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "add_axi_gpio.tcl assign_bd_address" }
+    },
+    {
+      "node_id": "COMP-B-clk_wiz_0",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-B",
+      "name": "clk_wiz_0",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:clk_wiz:6.0",
+      "source_file": "create_minimal_microblaze.tcl",
+      "source_doc": "SDOC-B-006",
+      "parameters": {
+        "CLKOUT1_FREQ_HZ": 100000000,
+        "CLKIN_FREQ_HZ": 100000000
+      },
+      "synthesis_primitives": { "MMCME2_ADV": 1, "BUFGCTRL": 3 },
+      "confirmed_synthesis": true,
+      "synthesis_evidence": "utilization_summary.txt: 1 MMCME2_ADV, 3 BUFGCTRL",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "utilization_summary.txt clocking section" }
+    },
+    {
+      "node_id": "COMP-B-rst_clk_wiz_0_100M",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-B",
+      "name": "rst_clk_wiz_0_100M",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:proc_sys_reset:5.0",
+      "source_file": "create_minimal_microblaze.tcl",
+      "source_doc": "SDOC-B-006",
+      "key_connections": {
+        "dcm_locked": "clk_wiz_0/locked",
+        "ext_reset_in": "board reset G4 (active-low)",
+        "peripheral_aresetn": "axi_gpio_0 + interconnect",
+        "mb_reset": "microblaze_0"
+      },
+      "confirmed_synthesis": true,
+      "synthesis_evidence": "utilization_summary.txt: microblaze_bd_rst_clk_wiz_0_100M_0",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "utilization_summary.txt instantiated netlists" }
+    },
+    {
+      "node_id": "COMP-B-mdm_1",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-B",
+      "name": "mdm_1",
+      "component_type": "IP_Core",
+      "vlnv": "xilinx.com:ip:mdm:3.2",
+      "source_file": "create_minimal_microblaze.tcl",
+      "source_doc": "SDOC-B-006",
+      "parameters": { "C_USE_UART": 1 },
+      "confirmed_synthesis": true,
+      "synthesis_evidence": "utilization_summary.txt: microblaze_bd_mdm_1_0",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "utilization_summary.txt" }
+    },
+    {
+      "node_id": "COMP-B-lmb_subsystem",
+      "node_type": "COMPONENT",
+      "project": "PROJECT-B",
+      "name": "LMB Memory Subsystem (dlmb_v10 + ilmb_v10 + dlmb_bram_if_cntlr + ilmb_bram_if_cntlr + lmb_bram_0)",
+      "component_type": "IP_Core",
+      "source_file": "create_minimal_microblaze.tcl",
+      "source_doc": "SDOC-B-006",
+      "parameters": { "size_KB": 8 },
+      "synthesis_bram": 2,
+      "confirmed_synthesis": true,
+      "synthesis_evidence": "utilization_summary.txt: 2 RAMB36E1, 5 instantiated LMB netlists",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "utilization_summary.txt" }
+    },
+
+    // ============================================================
+    // PHASE 2: CONSTRAINT NODES
+    // ============================================================
+    {
+      "node_id": "CONST-A-PIN-001",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-A",
+      "constraint_type": "pin",
+      "spec": "PWM_AUDIO_0_pwm → A11, LVCMOS33",
+      "source": "SDOC-A-006",
+      "active": true,
+      "note": "Only uncommented pins in XDC — audio is active",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "Nexys-A7-100T-Master.xdc line 179" }
+    },
+    {
+      "node_id": "CONST-A-PIN-002",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-A",
+      "constraint_type": "pin",
+      "spec": "PWM_AUDIO_0_en → D12, LVCMOS33",
+      "source": "SDOC-A-006",
+      "active": true,
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "Nexys-A7-100T-Master.xdc line 180" }
+    },
+    {
+      "node_id": "CONST-A-CLK-001",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-A",
+      "constraint_type": "clock",
+      "spec": "sys_clock: 100 MHz (E3, LVCMOS33)",
+      "source": "SDOC-A-005",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl clk_wiz_0 input config" }
+    },
+    {
+      "node_id": "CONST-A-CLK-002",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-A",
+      "constraint_type": "clock",
+      "spec": "clk_out1: 140.625 MHz → mig_7series_0/sys_clk_i",
+      "source": "SDOC-A-005",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl clk_wiz_0 output config" }
+    },
+    {
+      "node_id": "CONST-A-CLK-003",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-A",
+      "constraint_type": "clock",
+      "spec": "clk_out2: 24.576 MHz → fifo2audpwm_0/clk + fifo_generator_0/rd_clk",
+      "source": "SDOC-A-005",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl clk_wiz_0 output config" }
+    },
+    {
+      "node_id": "CONST-A-CLK-004",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-A",
+      "constraint_type": "clock",
+      "spec": "MIG ui_clk: ~81 MHz → MicroBlaze, AXI fabric, DMA, peripherals",
+      "source": "SDOC-A-005",
+      "confidence": "MEDIUM",
+      "note": "~81 MHz is derived, exact value depends on MIG DDR2 configuration",
+      "provenance": { "phase": 2, "source": "design_1.tcl MIG configuration (derived)" }
+    },
+    {
+      "node_id": "CONST-A-MEM-001",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-A",
+      "constraint_type": "memory",
+      "spec": "DDR2 128 MB @ 0x80000000, MIG 7-Series v4.1",
+      "source": "SDOC-A-005",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl MIG config" }
+    },
+    {
+      "node_id": "CONST-A-ADDR-001",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-A",
+      "constraint_type": "address",
+      "spec": "GPIO_IN: 0x40000000",
+      "source": "SDOC-A-005",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl address assignment" }
+    },
+    {
+      "node_id": "CONST-A-UART-001",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-A",
+      "constraint_type": "interface",
+      "spec": "AXI UARTLite: 230400 baud, 8N1, polling mode",
+      "source": "SDOC-A-005",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl axi_uartlite_0 config" }
+    },
+    {
+      "node_id": "CONST-A-DMA-001",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-A",
+      "constraint_type": "bandwidth",
+      "spec": "AXI DMA: 256-byte burst, 27-bit address width, simple mode (no SG)",
+      "source": "SDOC-A-005",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl axi_dma_0 parameters" }
+    },
+    {
+      "node_id": "CONST-B-CLK-001",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-B",
+      "constraint_type": "clock",
+      "spec": "sys_clock: 100 MHz, R4 (LVCMOS33), period 10.000 ns",
+      "source": "SDOC-B-004",
+      "active": true,
+      "note": "CRITICAL WARNING in synthesis: duplicate clock definitions — sys_clk_pin overrides sys_clock",
+      "issue_ref": "ISSUE-B-001",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "nexys_video.xdc line 4-5" }
+    },
+    {
+      "node_id": "CONST-B-PIN-RST",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-B",
+      "constraint_type": "pin",
+      "spec": "resetn → G4, LVCMOS15 (active-low)",
+      "source": "SDOC-B-004",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "nexys_video.xdc line 8" }
+    },
+    {
+      "node_id": "CONST-B-ADDR-001",
+      "node_type": "CONSTRAINT",
+      "project": "PROJECT-B",
+      "constraint_type": "address",
+      "spec": "AXI GPIO: 0x40000000 - 0x4000FFFF (64 KB)",
+      "source": "SDOC-B-007",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "add_axi_gpio.tcl assign_bd_address" }
+    },
+
+    // ============================================================
+    // PHASE 2: EVIDENCE NODES
+    // ============================================================
+    {
+      "node_id": "EVID-A-001",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "code",
+      "content": "axis2fifo.v:35 — `assign fifo_wr_data = axis_tdata[15:0];` (32→16 bit truncation)",
+      "source_file": "src/hdl/axis2fifo.v",
+      "line": 35,
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "direct code read" }
+    },
+    {
+      "node_id": "EVID-A-002",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "code",
+      "content": "fifo2audpwm.v:37 — `assign aud_pwm = count[DATA_WIDTH-1:0] <= duty[count[DATA_WIDTH+1:DATA_WIDTH]];` (256-level PWM)",
+      "source_file": "src/hdl/fifo2audpwm.v",
+      "line": 37,
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "direct code read" }
+    },
+    {
+      "node_id": "EVID-A-003",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "code",
+      "content": "tone_generator.v:69 — `assign axis_tlast = 1'b1;` (constant 1 — no packet framing, BUG)",
+      "source_file": "src/hdl/tone_generator.v",
+      "line": 69,
+      "confidence": "HIGH",
+      "parse_flag": "PARSE_UNCERTAIN — WHY tlast=1 was chosen not documented by engineer",
+      "provenance": { "phase": 2, "source": "direct code read" }
+    },
+    {
+      "node_id": "EVID-A-004",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "code",
+      "content": "helloworld.c:386 — `case DEMO_MODE_HW_TONE_GEN: break;` (hardware tone gen disabled in SW)",
+      "source_file": "sdk/appsrc/helloworld.c",
+      "line": 386,
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "SDOC-A-004 reference, confirmed via README" }
+    },
+    {
+      "node_id": "EVID-A-005",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "code",
+      "content": "helloworld.c:287 — `(u8)((u16)(wav_data[i]+32768)>>8)` — 16-bit signed to 8-bit unsigned conversion",
+      "source_file": "sdk/appsrc/helloworld.c",
+      "line": 287,
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "SDOC-A-004 reference" }
+    },
+    {
+      "node_id": "EVID-A-006",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "code",
+      "content": "axis2fifo.v:33 — `assign axis_tready = ~fifo_full;` (backpressure via FIFO full flag)",
+      "source_file": "src/hdl/axis2fifo.v",
+      "line": 33,
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "direct code read" }
+    },
+    {
+      "node_id": "EVID-A-007",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "code",
+      "content": "fifo2audpwm.v:23-26 — `aud_en <= 1` only when fifo_empty==0 (flow control)",
+      "source_file": "src/hdl/fifo2audpwm.v",
+      "lines": [23, 26],
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "direct code read" }
+    },
+    {
+      "node_id": "EVID-A-008",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "doc",
+      "content": "README.md — 'Hardware Tone Generation functionality is not currently working.'",
+      "source_file": "README.md",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "README.md direct read" }
+    },
+    {
+      "node_id": "EVID-A-009",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "config",
+      "content": "project_info.tcl line 4 — `set_property part xc7a50ticsg324-1L` (50T, project name says 100T → FPGA part inconsistency)",
+      "source_file": "project_info.tcl",
+      "line": 4,
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "project_info.tcl direct read" }
+    },
+    {
+      "node_id": "EVID-A-010",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "config",
+      "content": "design_1.tcl line 53 — `create_project project_1 myproj -part xc7a50ticsg324-1L` (also 50T, corroborates ISSUE-A-001)",
+      "source_file": "src/bd/design_1.tcl",
+      "line": 53,
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl direct read" }
+    },
+    {
+      "node_id": "EVID-A-011",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "code",
+      "content": "tone_generator.v:51-52 — `assign axis_tvalid = 1;` (always valid — no backpressure control)",
+      "source_file": "src/hdl/tone_generator.v",
+      "line": 51,
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "direct code read" }
+    },
+    {
+      "node_id": "EVID-A-012",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-A",
+      "evidence_type": "code",
+      "content": "tone_generator.v:72 — TODO: 'create AXI interface for configuration of INCREMENT and PACKET_SIZE params' (incomplete feature)",
+      "source_file": "src/hdl/tone_generator.v",
+      "line": 72,
+      "confidence": "MEDIUM",
+      "provenance": { "phase": 2, "source": "direct code read — TODO comment extraction" }
+    },
+    {
+      "node_id": "EVID-B-001",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-B",
+      "evidence_type": "report",
+      "content": "utilization_summary.txt — Synthesis PASSED: 1412 LUT (1.05%), 1285 FF (0.48%), 2 BRAM (0.55%), WNS > 0 ns",
+      "source_file": "utilization_summary.txt",
+      "metrics": {
+        "slice_LUTs": 1412,
+        "utilization_LUT_pct": 1.05,
+        "slice_registers": 1285,
+        "block_RAM": 2,
+        "DSPs": 0,
+        "MMCME2_ADV": 1,
+        "BUFGCTRL": 3
+      },
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "utilization_summary.txt direct read" }
+    },
+    {
+      "node_id": "EVID-B-002",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-B",
+      "evidence_type": "code",
+      "content": "axi_gpio_wrapper.v:13-31 — AXI tie-off: awvalid=0, wvalid=0, arvalid=0, bready=1, rready=1 (AXI Slave Tie-off Pattern)",
+      "source_file": "vivado_axi_simple/axi_gpio_wrapper.v",
+      "lines": [13, 31],
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "direct code read" }
+    },
+    {
+      "node_id": "EVID-B-003",
+      "node_type": "EVIDENCE",
+      "project": "PROJECT-B",
+      "evidence_type": "doc",
+      "content": "SYNTHESIS_RESULTS.md — 3 CRITICAL WARNINGs: duplicate clock, missing UART ports in XDC, LMB clock period mismatch (all accepted as non-blocking)",
+      "source_file": "SYNTHESIS_RESULTS.md",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "SYNTHESIS_RESULTS.md direct read" }
+    },
+
+    // ============================================================
+    // PHASE 2: ISSUE NODES
+    // ============================================================
+    {
+      "node_id": "ISSUE-A-001",
+      "node_type": "ISSUE",
+      "project": "PROJECT-A",
+      "severity": "critical",
+      "title": "FPGA Part Tutarsızlığı: project_info.tcl ve design_1.tcl 50T, proje 100T",
+      "description": "project_info.tcl (line 4) ve design_1.tcl (line 53) xc7a50ticsg324-1L (Nexys A7-50T) kullanıyor. Proje adı, README ve ister dokümanı xc7a100tcsg324-1 (Nexys A7-100T) bekliyor. XDC dosyası Nexys-A7-100T-Master.xdc adını taşıyor. Bu kritik tutarsızlık, yanlış FPGA için sentez yapılmasına ve 50T'nin kaynak kısıtı nedeniyle sentezin başarısız olmasına yol açabilir.",
+      "evidence_refs": ["EVID-A-009", "EVID-A-010"],
+      "affected_requirements": ["DMA-REQ-L0-001"],
+      "related_constraint_conflict": "CONST-A-CLK-002: 140.625 MHz MIG reference clock → 50T'de DDR2 PHY timing farklı",
+      "remediation": "project_info.tcl ve design_1.tcl'de part xc7a100tcsg324-1 olarak güncellenmeli; board_part digilentinc.com:nexys-a7-100t:part0:1.0 olmalı",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "project_info.tcl + design_1.tcl cross-check" }
+    },
+    {
+      "node_id": "ISSUE-A-002",
+      "node_type": "ISSUE",
+      "project": "PROJECT-A",
+      "severity": "high",
+      "title": "HW Tone Generator çalışmıyor: axis_tlast=1 hatası + SW'de devre dışı",
+      "description": "tone_generator.v:69 — axis_tlast sabit 1 atanmış, her clock cycle'da TLAST aktif → DMA her transfer'i 1 beat olarak görür, burst verimsiz. Ayrıca modül 16-bit üretirken fifo2audpwm 8-bit bekliyor (genişlik uyumsuzluğu). Yazılımda DEMO_MODE_HW_TONE_GEN case'i sadece break yapıyor (helloworld.c:386).",
+      "parse_flag": "PARSE_UNCERTAIN — WHY axis_tlast=1 chose mühendis belgesi yok; README 'not currently working' dışında açıklama yok",
+      "evidence_refs": ["EVID-A-003", "EVID-A-004", "EVID-A-008", "EVID-A-011", "EVID-A-012"],
+      "affected_requirements": ["DMA-REQ-L2-003"],
+      "remediation": "1) axis_tlast = (packet_count == PACKET_SIZE-1) olarak düzelt; 2) output genişliğini 8-bit'e indirge; 3) helloworld.c case DEMO_MODE_HW_TONE_GEN'de dma_forward çağır",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "tone_generator.v:69 direct parse + helloworld.c reference" }
+    },
+    {
+      "node_id": "ISSUE-A-003",
+      "node_type": "ISSUE",
+      "project": "PROJECT-A",
+      "severity": "medium",
+      "title": "Sadece 96 kHz WAV destekleniyor",
+      "description": "PWM clock (24.576 MHz) / 256 = 96 kHz sabit donanım clock'u. Farklı sample rate WAV dosyaları reddediliyor veya yanlış çalıyor.",
+      "evidence_refs": ["EVID-A-008"],
+      "affected_requirements": ["DMA-REQ-L2-005"],
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "README.md known issues" }
+    },
+    {
+      "node_id": "ISSUE-A-004",
+      "node_type": "ISSUE",
+      "project": "PROJECT-A",
+      "severity": "medium",
+      "title": "16-bit → 8-bit truncation ses kalitesini düşürür",
+      "description": "16-bit WAV dosyaları 8-bit'e truncate ediliyor → ~48 dB yerine ~8-bit SNR.",
+      "evidence_refs": ["EVID-A-005"],
+      "affected_requirements": ["DMA-REQ-L2-005"],
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "helloworld.c:287 direct reference" }
+    },
+    {
+      "node_id": "ISSUE-A-005",
+      "node_type": "ISSUE",
+      "project": "PROJECT-A",
+      "severity": "low",
+      "title": "WAV dosyaları bellekte kalıcı saklanmaz",
+      "description": "Oynatma sonrası WAV verisi DDR2'de kalır ama uygulama kapatıldığında veya yeniden başladığında kaybolur. BRAM veya flash'a yazma mekanizması yok.",
+      "affected_requirements": ["DMA-REQ-L2-005"],
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "README.md known issues" }
+    },
+    {
+      "node_id": "ISSUE-A-006",
+      "node_type": "ISSUE",
+      "project": "PROJECT-A",
+      "severity": "low",
+      "title": "Polling tabanlı GPIO — interrupt handler implement edilmemiş",
+      "description": "Donanımda INTC + xlconcat mevcut ama yazılım polling kullanıyor. INTC donanım kaynağı boşa harcanıyor. Buton DMA transfer sırasında basılırsa kaçırılabilir.",
+      "affected_requirements": ["DMA-REQ-L2-006", "DMA-REQ-L2-011"],
+      "decision_ref": "DMA-DEC-005",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "helloworld.c main loop analysis" }
+    },
+    {
+      "node_id": "ISSUE-A-007",
+      "node_type": "ISSUE",
+      "project": "PROJECT-A",
+      "severity": "info",
+      "title": "Testbench dosyası yok",
+      "description": "src/ altında simülasyon testbench'i bulunmuyor. Fonksiyonel doğrulama sadece hardware üzerinde yapılabilir.",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "project directory structure scan" }
+    },
+    {
+      "node_id": "ISSUE-A-008",
+      "node_type": "ISSUE",
+      "project": "PROJECT-A",
+      "severity": "info",
+      "title": "digilent-vivado-scripts submodule boş (init edilmemiş)",
+      "description": ".gitmodules'da tanımlı ama init/update yapılmamış. TCL build automation çalışmaz.",
+      "affected_requirements": ["DMA-REQ-L1-005"],
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": ".gitmodules file reference" }
+    },
+    {
+      "node_id": "ISSUE-B-001",
+      "node_type": "ISSUE",
+      "project": "PROJECT-B",
+      "severity": "low",
+      "title": "XDC'de duplicate clock definition — sys_clk_pin overrides sys_clock",
+      "description": "nexys_video.xdc (or generated MB XDC) defines clock twice. CRITICAL WARNING from Vivado: [Constraints 18-1056]. Final timing still passes but XDC should be cleaned.",
+      "evidence_refs": ["EVID-B-003"],
+      "remediation": "Remove duplicate clock constraint, keep only one create_clock",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "SYNTHESIS_RESULTS.md Critical Warnings section" }
+    },
+    {
+      "node_id": "ISSUE-B-002",
+      "node_type": "ISSUE",
+      "project": "PROJECT-B",
+      "severity": "info",
+      "title": "XDC'de UART port tanımları var ama design'da UART yok",
+      "description": "CRITICAL WARNING: [Common 17-55] 'set_property' expects at least one object for ports 'usb_uart_rxd' and 'usb_uart_txd'. XDC has template UART pins not used in current design.",
+      "evidence_refs": ["EVID-B-003"],
+      "remediation": "Remove unused UART lines from XDC",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "SYNTHESIS_RESULTS.md" }
+    },
+    {
+      "node_id": "ISSUE-B-003",
+      "node_type": "ISSUE",
+      "project": "PROJECT-B",
+      "severity": "info",
+      "title": "Tam Sistem (AXI BRAM + GPIO) geliştirilmekte — block automation timeout",
+      "description": "README.md: '⏳ Geliştirilmekte — Block Automation'dan sonra Connection Automation: Stuck (5+ dakika)'. Seviye 3 örneği henüz tamamlanmamış.",
+      "affected_requirements": ["AXI-REQ-L0-001 (partial)"],
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "README.md Status section" }
+    },
+
+    // ============================================================
+    // PHASE 2: PATTERN NODES
+    // ============================================================
+    {
+      "node_id": "PAT-A-001",
+      "node_type": "PATTERN",
+      "project": "PROJECT-A",
+      "pattern_name": "Phase Accumulator Tone Generation",
+      "description": "accum += INCREMENT; sample = accum >> (ACCUMULATOR_DEPTH - OUTPUT_BITS). Produces frequency = INCREMENT / 2^DEPTH * sample_rate",
+      "instances": ["COMP-A-tone_generator_0 (HW, 32-bit)", "COMP-A-helloworld (SW, same algorithm)"],
+      "educational_value": "high",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "tone_generator.v:49-58 + helloworld.c SW equivalent" }
+    },
+    {
+      "node_id": "PAT-A-002",
+      "node_type": "PATTERN",
+      "project": "PROJECT-A",
+      "pattern_name": "AXI-Stream to FIFO Bridge",
+      "description": "Minimal RTL adapter: axis_tready = ~fifo_full; fifo_wr_en = axis_tready & axis_tvalid; fifo_wr_data = axis_tdata[N:0]",
+      "instances": ["COMP-A-axis2fifo_0"],
+      "educational_value": "high",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "axis2fifo.v:33-35" }
+    },
+    {
+      "node_id": "PAT-A-003",
+      "node_type": "PATTERN",
+      "project": "PROJECT-A",
+      "pattern_name": "Counter-based PWM",
+      "description": "pwm_out = (counter < duty_cycle). Counter wraps creating PWM carrier. Duty cycle changes on counter overflow.",
+      "instances": ["COMP-A-fifo2audpwm_0"],
+      "educational_value": "high",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "fifo2audpwm.v:37" }
+    },
+    {
+      "node_id": "PAT-A-004",
+      "node_type": "PATTERN",
+      "project": "PROJECT-A",
+      "pattern_name": "Dual-Clock FIFO CDC",
+      "description": "Xilinx FIFO Generator in independent_clocks mode with gray-code pointers for safe clock domain crossing",
+      "instances": ["COMP-A-fifo_generator_0"],
+      "educational_value": "high",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "design_1.tcl fifo_generator config" }
+    },
+    {
+      "node_id": "PAT-A-005",
+      "node_type": "PATTERN",
+      "project": "PROJECT-A",
+      "pattern_name": "FIFO Backpressure via Full Flag",
+      "description": "Upstream tready = ~fifo_full — when FIFO is full, DMA is stalled via AXI-Stream backpressure",
+      "instances": ["COMP-A-axis2fifo_0"],
+      "educational_value": "high",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "axis2fifo.v:33" }
+    },
+    {
+      "node_id": "PAT-A-006",
+      "node_type": "PATTERN",
+      "project": "PROJECT-A",
+      "pattern_name": "WAV Header Parsing via Struct Pointer Cast",
+      "description": "Raw byte buffer cast to Wav_HeaderRaw/FormatRaw/DataRaw structs for RIFF chunk navigation",
+      "instances": ["COMP-A-helloworld"],
+      "educational_value": "medium",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "helloworld.c SDOC-A-004 reference" }
+    },
+    {
+      "node_id": "PAT-B-001",
+      "node_type": "PATTERN",
+      "project": "PROJECT-B",
+      "pattern_name": "AXI Slave Tie-off",
+      "description": "Standalone AXI IP instantiation with all AXI input ports tied to safe values: awvalid=0, wvalid=0, arvalid=0 (no requests), bready=1, rready=1 (always accept responses)",
+      "instances": ["COMP-B-axi_gpio_wrapper"],
+      "educational_value": "very_high",
+      "note": "This pattern teaches AXI signal semantics explicitly",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "axi_gpio_wrapper.v:13-31" }
+    },
+    {
+      "node_id": "PAT-B-002",
+      "node_type": "PATTERN",
+      "project": "PROJECT-B",
+      "pattern_name": "Kademeli Eğitim (Graduated Complexity)",
+      "description": "3-level progression: Lvl1=Standalone GPIO (tie-off, ~8s) → Lvl2=Minimal MicroBlaze+GPIO (no peripherals, ~20s) → Lvl3=MicroBlaze+AXI GPIO (full system, ~4min synthesis)",
+      "instances": ["create_axi_simple_gpio.tcl", "create_minimal_microblaze.tcl", "add_axi_gpio.tcl"],
+      "educational_value": "very_high",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "README.md + TCL script analysis" }
+    },
+    {
+      "node_id": "PAT-B-003",
+      "node_type": "PATTERN",
+      "project": "PROJECT-B",
+      "pattern_name": "CLI-First TCL Batch Automation",
+      "description": "vivado -mode batch -source script.tcl pattern for reproducible, version-controlled block design creation. 8-20 second project creation vs 5-10 min GUI.",
+      "instances": ["create_axi_simple_gpio.tcl", "create_minimal_microblaze.tcl", "add_axi_gpio.tcl", "run_synthesis.tcl"],
+      "educational_value": "very_high",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "README.md methodology section" }
+    },
+    {
+      "node_id": "PAT-B-004",
+      "node_type": "PATTERN",
+      "project": "PROJECT-B",
+      "pattern_name": "Block Design Automation (apply_bd_automation)",
+      "description": "Vivado's apply_bd_automation command automatically creates LMB, reset controller, MDM, clock connections for MicroBlaze subsystem",
+      "instances": ["create_minimal_microblaze.tcl"],
+      "educational_value": "high",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "create_minimal_microblaze.tcl + SYNTHESIS_RESULTS.md" }
+    },
+    {
+      "node_id": "PAT-B-005",
+      "node_type": "PATTERN",
+      "project": "PROJECT-B",
+      "pattern_name": "PLL Lock → Reset Release",
+      "description": "clk_wiz.locked → proc_sys_reset.dcm_locked ensures system only resets after PLL is stable. Prevents metastability on startup.",
+      "instances": ["COMP-B-clk_wiz_0 → COMP-B-rst_clk_wiz_0_100M"],
+      "educational_value": "very_high",
+      "note": "Cross-project pattern: same pattern in PROJECT-A (MIG-based) and PROJECT-B (PLL-based)",
+      "confidence": "HIGH",
+      "provenance": { "phase": 2, "source": "create_minimal_microblaze.tcl + SYNTHESIS_RESULTS.md connections" }
+    },
+
+    // ============================================================
+    // PHASE 3: REQUIREMENT NODES — PROJECT-A
+    // ============================================================
+    {
+      "node_id": "DMA-REQ-L0-001",
+      "node_type": "REQUIREMENT",
+      "project": "PROJECT-A",
+      "req_id": "DMA-REQ-L0-001",
+      "level": "L0",
+      "type": "functional",
+      "priority": "must",
+      "status": "active",
+      "title": "Sistem Gereksinimleri — Nexys A7-100T DMA Audio Demo",
+      "acceptance_criteria": [
+        "Nexys A7-100T üzerinde DMA tabanlı ses akışı gerçekleştirilir",
+        "DDR2 RAM üzerinden ses verisi PWM çıkışa aktarılır",
+        "Kullanıcı butonlarla mod seçimi yapabilir",
+        "UART üzerinden WAV dosyası alınıp oynatılabilir",
+        "Seri terminal (230400 baud) üzerinden etkileşim sağlanır"
+      ],
+      "confidence": "HIGH",
+      "version": 1,
+      "last_updated": "2026-02-23",
+      "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 4.2" }
+    },
+    {
+      "node_id": "DMA-REQ-L1-001",
+      "node_type": "REQUIREMENT",
+      "project": "PROJECT-A",
+      "req_id": "DMA-REQ-L1-001",
+      "level": "L1",
+      "type": "functional",
+      "priority": "must",
+      "status": "active",
+      "parent": "DMA-REQ-L0-001",
+      "title": "Veri Yolu Alt Sistemi (Data Path)",
+      "acceptance_criteria": [
+        "AXI DMA MM2S kanalı ile DDR2'den ses verisi stream edilir",
+        "AXI DMA S2MM kanalı ile ses verisi DDR2'ye kaydedilir",
+        "DMA ↔ DDR2 veri yolu AXI Interconnect ile yönetilir",
+        "Dual-clock FIFO ile DMA clock → audio clock geçişi sağlanır"
+      ],
+      "confidence": "HIGH",
+      "version": 1,
+      "last_updated": "2026-02-23",
+      "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 4.2" }
+    },
+    {
+      "node_id": "DMA-REQ-L1-002",
+      "node_type": "REQUIREMENT",
+      "project": "PROJECT-A",
+      "req_id": "DMA-REQ-L1-002",
+      "level": "L1",
+      "type": "functional",
+      "priority": "must",
+      "status": "active",
+      "parent": "DMA-REQ-L0-001",
+      "title": "I/O Periferikleri Alt Sistemi",
+      "confidence": "HIGH",
+      "version": 1,
+      "last_updated": "2026-02-23",
+      "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 4.2" }
+    },
+    {
+      "node_id": "DMA-REQ-L1-003",
+      "node_type": "REQUIREMENT",
+      "project": "PROJECT-A",
+      "req_id": "DMA-REQ-L1-003",
+      "level": "L1",
+      "type": "functional",
+      "priority": "must",
+      "status": "active",
+      "parent": "DMA-REQ-L0-001",
+      "title": "İşleme Alt Sistemi (Processing)",
+      "confidence": "HIGH",
+      "version": 1,
+      "last_updated": "2026-02-23",
+      "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 4.2" }
+    },
+    {
+      "node_id": "DMA-REQ-L1-004",
+      "node_type": "REQUIREMENT",
+      "project": "PROJECT-A",
+      "req_id": "DMA-REQ-L1-004",
+      "level": "L1",
+      "type": "functional",
+      "priority": "must",
+      "status": "active",
+      "parent": "DMA-REQ-L0-001",
+      "title": "Altyapı Alt Sistemi (Infrastructure)",
+      "confidence": "HIGH",
+      "version": 1,
+      "last_updated": "2026-02-23",
+      "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 4.2" }
+    },
+    {
+      "node_id": "DMA-REQ-L1-005",
+      "node_type": "REQUIREMENT",
+      "project": "PROJECT-A",
+      "req_id": "DMA-REQ-L1-005",
+      "level": "L1",
+      "type": "non-functional",
+      "priority": "could",
+      "status": "active",
+      "parent": "DMA-REQ-L0-001",
+      "title": "Otomasyon/Build Alt Sistemi",
+      "confidence": "HIGH",
+      "version": 1,
+      "last_updated": "2026-02-23",
+      "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 4.2" }
+    },
+    {
+      "node_id": "DMA-REQ-L1-006",
+      "node_type": "REQUIREMENT",
+      "project": "PROJECT-A",
+      "req_id": "DMA-REQ-L1-006",
+      "level": "L1",
+      "type": "functional",
+      "priority": "must",
+      "status": "active",
+      "parent": "DMA-REQ-L0-001",
+      "title": "Sinyal Yolu Alt Sistemi (Signal Path) [v2.0 YENİ]",
+      "acceptance_criteria": [
+        "3 clock domain arası geçişler güvenli yapılır",
+        "Reset zinciri: MIG ui_clk_sync_rst → proc_sys_reset → peripheral_aresetn",
+        "AXI-Stream handshake doğru uygulanır",
+        "FIFO status sinyalleri backpressure sağlar",
+        "Interrupt sinyalleri doğru yönlendirilir",
+        "PWM enable sinyali FIFO durumuna göre kontrol edilir"
+      ],
+      "confidence": "HIGH",
+      "version": 1,
+      "last_updated": "2026-02-23",
+      "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 4.2 [v2.0 NEW]" }
+    },
+    {
+      "node_id": "DMA-REQ-L2-001", "node_type": "REQUIREMENT", "project": "PROJECT-A", "level": "L2", "parent": "DMA-REQ-L1-001", "title": "AXI-Stream → FIFO Dönüştürücü (axis2fifo)", "priority": "must", "implementing_component": "COMP-A-axis2fifo_0", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt L2 section" }
+    },
+    {
+      "node_id": "DMA-REQ-L2-002", "node_type": "REQUIREMENT", "project": "PROJECT-A", "level": "L2", "parent": "DMA-REQ-L1-002", "title": "FIFO → PWM Ses Dönüştürücü (fifo2audpwm)", "priority": "must", "implementing_component": "COMP-A-fifo2audpwm_0", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "DMA-REQ-L2-003", "node_type": "REQUIREMENT", "project": "PROJECT-A", "level": "L2", "parent": "DMA-REQ-L1-001", "title": "Donanım Ton Üreteci (tone_generator)", "priority": "should", "status": "active", "note": "Çalışmıyor ama tasarımda mevcut — ISSUE-A-002", "implementing_component": "COMP-A-tone_generator_0", "parse_flag": "PARSE_UNCERTAIN", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "DMA-REQ-L2-004", "node_type": "REQUIREMENT", "project": "PROJECT-A", "level": "L2", "parent": "DMA-REQ-L1-001", "title": "Dual-Clock FIFO (CDC)", "priority": "must", "implementing_component": "COMP-A-fifo_generator_0", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "DMA-REQ-L2-005", "node_type": "REQUIREMENT", "project": "PROJECT-A", "level": "L2", "parent": "DMA-REQ-L1-002", "title": "UART WAV Dosyası Alma ve Oynatma", "priority": "must", "implementing_component": "COMP-A-axi_uartlite_0 + COMP-A-helloworld", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "DMA-REQ-L2-006", "node_type": "REQUIREMENT", "project": "PROJECT-A", "level": "L2", "parent": "DMA-REQ-L1-002", "title": "GPIO Kullanıcı Arayüzü", "priority": "must", "implementing_component": "COMP-A-GPIO_IN + COMP-A-GPIO_OUT", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "DMA-REQ-L2-007", "node_type": "REQUIREMENT", "project": "PROJECT-A", "level": "L2", "parent": "DMA-REQ-L1-003", "title": "Yazılımla Ton Üretimi (SW Tone Gen)", "priority": "must", "implementing_component": "COMP-A-helloworld", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "DMA-REQ-L2-008", "node_type": "REQUIREMENT", "project": "PROJECT-A", "level": "L2", "parent": "DMA-REQ-L1-004", "title": "Clock Wizard", "priority": "must", "implementing_component": "COMP-A-clk_wiz_0", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "DMA-REQ-L2-009", "node_type": "REQUIREMENT", "project": "PROJECT-A", "level": "L2", "parent": "DMA-REQ-L1-004", "title": "Reset Controller", "priority": "must", "implementing_component": "COMP-A-rst_mig_7series_0_81M", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "DMA-REQ-L2-010", "node_type": "REQUIREMENT", "project": "PROJECT-A", "level": "L2", "parent": "DMA-REQ-L1-004", "title": "Debug Module (MDM)", "priority": "should", "implementing_component": "COMP-A-mdm_1", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "DMA-REQ-L2-011",
+      "node_type": "REQUIREMENT",
+      "project": "PROJECT-A",
+      "req_id": "DMA-REQ-L2-011",
+      "level": "L2",
+      "parent": "DMA-REQ-L1-003",
+      "title": "Interrupt Controller",
+      "priority": "should",
+      "implementing_component": "COMP-A-microblaze_0_axi_intc + COMP-A-xlconcat_0 + COMP-A-xlconcat_1",
+      "parse_flag": "PARSE_UNCERTAIN",
+      "confidence": "MEDIUM",
+      "note": "Hardware present, software uses polling. See DMA-DEC-005.",
+      "version": 1,
+      "last_updated": "2026-02-23",
+      "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+
+    // ============================================================
+    // PHASE 3: REQUIREMENT NODES — PROJECT-B
+    // ============================================================
+    {
+      "node_id": "AXI-REQ-L0-001", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L0", "type": "educational", "priority": "must", "status": "active", "title": "AXI Bus Mimarisi Eğitim / Validasyon Test Suite", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 5.2" }
+    },
+    {
+      "node_id": "AXI-REQ-L1-001", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L1", "parent": "AXI-REQ-L0-001", "title": "I/O Periferikleri Alt Sistemi", "priority": "must", "implementing_component": "COMP-B-axi_gpio_0", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 5.2" }
+    },
+    {
+      "node_id": "AXI-REQ-L1-002", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L1", "parent": "AXI-REQ-L0-001", "title": "İşleme Alt Sistemi (Processing)", "priority": "must", "implementing_component": "COMP-B-microblaze_0", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 5.2" }
+    },
+    {
+      "node_id": "AXI-REQ-L1-003", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L1", "parent": "AXI-REQ-L0-001", "title": "Altyapı Alt Sistemi (Infrastructure)", "priority": "must", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 5.2" }
+    },
+    {
+      "node_id": "AXI-REQ-L1-004", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L1", "parent": "AXI-REQ-L0-001", "title": "Otomasyon/Build Alt Sistemi", "priority": "must", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 5.2" }
+    },
+    {
+      "node_id": "AXI-REQ-L1-005", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L1", "parent": "AXI-REQ-L0-001", "title": "Sinyal Yolu Alt Sistemi (Signal Path) [v2.0 YENİ]", "priority": "must", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt section 5.2 [v2.0 NEW]" }
+    },
+    {
+      "node_id": "AXI-REQ-L2-001", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L2", "parent": "AXI-REQ-L1-001", "title": "AXI GPIO Wrapper (Standalone)", "priority": "should", "implementing_component": "COMP-B-axi_gpio_wrapper", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "AXI-REQ-L2-002", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L2", "parent": "AXI-REQ-L1-001", "title": "Basit Test Sayacı (simple_top)", "priority": "could", "implementing_component": "COMP-B-simple_top", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "AXI-REQ-L2-003", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L2", "parent": "AXI-REQ-L1-003", "title": "Clock Wizard", "priority": "must", "implementing_component": "COMP-B-clk_wiz_0", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "AXI-REQ-L2-004", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L2", "parent": "AXI-REQ-L1-003", "title": "LMB Bellek Hiyerarşisi", "priority": "must", "implementing_component": "COMP-B-lmb_subsystem", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "AXI-REQ-L2-005", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L2", "parent": "AXI-REQ-L1-002", "title": "AXI Interconnect", "priority": "must", "implementing_component": "COMP-B-microblaze_0_axi_periph", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "AXI-REQ-L2-006", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L2", "parent": "AXI-REQ-L1-003", "title": "Reset Controller", "priority": "must", "implementing_component": "COMP-B-rst_clk_wiz_0_100M", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+    {
+      "node_id": "AXI-REQ-L2-007", "node_type": "REQUIREMENT", "project": "PROJECT-B", "level": "L2", "parent": "AXI-REQ-L1-003", "title": "MicroBlaze Debug Module (MDM)", "priority": "should", "implementing_component": "COMP-B-mdm_1", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt" }
+    },
+
+    // ============================================================
+    // PHASE 3: DECISION NODES — PROJECT-A
+    // ============================================================
+    {
+      "node_id": "DMA-DEC-001", "node_type": "DECISION", "project": "PROJECT-A", "title": "Ses çıkış yöntemi olarak PWM seçimi", "chosen_option": "FPGA dahili PWM + onboard SSM2377 amplifier", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt DMA-DEC-001" }
+    },
+    {
+      "node_id": "DMA-DEC-002", "node_type": "DECISION", "project": "PROJECT-A", "title": "MicroBlaze + AXI DMA mimarisi seçimi", "chosen_option": "MicroBlaze soft processor + AXI DMA simple mode", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt DMA-DEC-002" }
+    },
+    {
+      "node_id": "DMA-DEC-003", "node_type": "DECISION", "project": "PROJECT-A", "title": "Clock Domain Crossing: Dual-Clock FIFO", "chosen_option": "Xilinx FIFO Generator IP (dual-clock, independent_clocks)", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt DMA-DEC-003" }
+    },
+    {
+      "node_id": "DMA-DEC-004", "node_type": "DECISION", "project": "PROJECT-A", "title": "8-bit Audio Çözünürlük Kararı", "chosen_option": "8-bit unsigned PWM (256 seviye)", "rationale": "24.576 MHz / 256 = 96 kHz carrier > 20 kHz audible range. 16-bit would give 375 Hz carrier (audible!)", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt DMA-DEC-004" }
+    },
+    {
+      "node_id": "DMA-DEC-005",
+      "node_type": "DECISION",
+      "project": "PROJECT-A",
+      "title": "Interrupt controller kurulması ama yazılımda polling kullanılması",
+      "chosen_option": "Donanımda interrupt mevcut, yazılımda polling",
+      "confidence": "MEDIUM",
+      "parse_flag": "PARSE_UNCERTAIN — engineer did not document this decision explicitly",
+      "classification": "DECISION (not Coverage Gap)",
+      "classification_rationale": "Hardware requirement DMA-REQ-L2-011 is satisfied (INTC is present). The software not using interrupts is a documented architectural choice (DMA-DEC-005), even if PARSE_UNCERTAIN about motivation. This is NOT a coverage gap because: (1) the hardware component exists and is correctly instantiated, (2) the decision to use polling is deliberate (Block Automation default + simplicity for demo), (3) future interrupt-driven mode is explicitly mentioned as next step.",
+      "version": 1,
+      "last_updated": "2026-02-23",
+      "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt DMA-DEC-005" }
+    },
+
+    // ============================================================
+    // PHASE 3: DECISION NODES — PROJECT-B
+    // ============================================================
+    {
+      "node_id": "AXI-DEC-001", "node_type": "DECISION", "project": "PROJECT-B", "title": "CLI-First TCL Batch metodolojisi", "chosen_option": "vivado -mode batch -source script.tcl", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt AXI-DEC-001" }
+    },
+    {
+      "node_id": "AXI-DEC-002", "node_type": "DECISION", "project": "PROJECT-B", "title": "3 seviyeli kademeli eğitim yaklaşımı", "chosen_option": "Standalone GPIO → Minimal MicroBlaze → MicroBlaze + AXI GPIO", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt AXI-DEC-002" }
+    },
+    {
+      "node_id": "AXI-DEC-003", "node_type": "DECISION", "project": "PROJECT-B", "title": "MicroBlaze v11.0 seçimi", "chosen_option": "MicroBlaze v11.0 (Vivado 2025.1 default)", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt AXI-DEC-003" }
+    },
+    {
+      "node_id": "AXI-DEC-004", "node_type": "DECISION", "project": "PROJECT-B", "title": "8 KB LMB BRAM bellek boyutu", "chosen_option": "8 KB shared BRAM (Block Automation minimum)", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt AXI-DEC-004" }
+    },
+    {
+      "node_id": "AXI-DEC-005", "node_type": "DECISION", "project": "PROJECT-B", "title": "Nexys Video board seçimi (Artix-7 200T)", "chosen_option": "Digilent Nexys Video (xc7a200tsbg484-1)", "confidence": "HIGH", "version": 1, "last_updated": "2026-02-23", "provenance": { "phase": 3, "source": "FPGA_RAG_ISTER_DOKUMANI_v2.txt AXI-DEC-005" }
+    }
+  ],
+
+  "edges": [
+
+    // ============================================================
+    // PHASE 3: DECOMPOSES_TO EDGES (Requirement tree)
+    // ============================================================
+    { "edge_id": "E-DEC-001", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L0-001", "to": "DMA-REQ-L1-001", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-002", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L0-001", "to": "DMA-REQ-L1-002", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-003", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L0-001", "to": "DMA-REQ-L1-003", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-004", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L0-001", "to": "DMA-REQ-L1-004", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-005", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L0-001", "to": "DMA-REQ-L1-005", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-006", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L0-001", "to": "DMA-REQ-L1-006", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-007", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L1-001", "to": "DMA-REQ-L2-001", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-008", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L1-002", "to": "DMA-REQ-L2-002", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-009", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L1-001", "to": "DMA-REQ-L2-003", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-010", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L1-001", "to": "DMA-REQ-L2-004", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-011", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L1-002", "to": "DMA-REQ-L2-005", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-012", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L1-002", "to": "DMA-REQ-L2-006", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-013", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L1-003", "to": "DMA-REQ-L2-007", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-014", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L1-004", "to": "DMA-REQ-L2-008", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-015", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L1-004", "to": "DMA-REQ-L2-009", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-016", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L1-004", "to": "DMA-REQ-L2-010", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-017", "edge_type": "DECOMPOSES_TO", "from": "DMA-REQ-L1-003", "to": "DMA-REQ-L2-011", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-018", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L0-001", "to": "AXI-REQ-L1-001", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-019", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L0-001", "to": "AXI-REQ-L1-002", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-020", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L0-001", "to": "AXI-REQ-L1-003", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-021", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L0-001", "to": "AXI-REQ-L1-004", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-022", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L0-001", "to": "AXI-REQ-L1-005", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-023", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L1-001", "to": "AXI-REQ-L2-001", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-024", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L1-001", "to": "AXI-REQ-L2-002", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-025", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L1-003", "to": "AXI-REQ-L2-003", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-026", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L1-003", "to": "AXI-REQ-L2-004", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-027", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L1-002", "to": "AXI-REQ-L2-005", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-028", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L1-003", "to": "AXI-REQ-L2-006", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-DEC-029", "edge_type": "DECOMPOSES_TO", "from": "AXI-REQ-L1-003", "to": "AXI-REQ-L2-007", "confidence": "HIGH", "provenance": { "phase": 3 } },
+
+    // ============================================================
+    // PHASE 3: MOTIVATED_BY EDGES (Decision → Requirement)
+    // ============================================================
+    { "edge_id": "E-MOT-001", "edge_type": "MOTIVATED_BY", "from": "DMA-DEC-001", "to": "DMA-REQ-L1-002", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-MOT-002", "edge_type": "MOTIVATED_BY", "from": "DMA-DEC-002", "to": "DMA-REQ-L1-001", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-MOT-003", "edge_type": "MOTIVATED_BY", "from": "DMA-DEC-003", "to": "DMA-REQ-L2-004", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-MOT-004", "edge_type": "MOTIVATED_BY", "from": "DMA-DEC-004", "to": "DMA-REQ-L2-002", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-MOT-005", "edge_type": "MOTIVATED_BY", "from": "DMA-DEC-005", "to": "DMA-REQ-L2-011", "confidence": "MEDIUM", "provenance": { "phase": 3 } },
+    { "edge_id": "E-MOT-006", "edge_type": "MOTIVATED_BY", "from": "AXI-DEC-001", "to": "AXI-REQ-L1-004", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-MOT-007", "edge_type": "MOTIVATED_BY", "from": "AXI-DEC-002", "to": "AXI-REQ-L0-001", "confidence": "HIGH", "provenance": { "phase": 3 } },
+    { "edge_id": "E-MOT-008", "edge_type": "MOTIVATED_BY", "from": "AXI-DEC-005", "to": "AXI-REQ-L0-001", "confidence": "HIGH", "provenance": { "phase": 3 } },
+
+    // ============================================================
+    // PHASE 2: DEPENDS_ON EDGES (Component dependencies)
+    // ============================================================
+    { "edge_id": "E-DEP-001", "edge_type": "DEPENDS_ON", "from": "COMP-A-axis2fifo_0", "to": "COMP-A-fifo_generator_0", "confidence": "HIGH", "note": "axis2fifo writes to FIFO (full flag feedback)", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-002", "edge_type": "DEPENDS_ON", "from": "COMP-A-fifo2audpwm_0", "to": "COMP-A-fifo_generator_0", "confidence": "HIGH", "note": "fifo2audpwm reads from FIFO (empty flag feedback)", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-003", "edge_type": "DEPENDS_ON", "from": "COMP-A-fifo_generator_0", "to": "COMP-A-clk_wiz_0", "confidence": "HIGH", "note": "rd_clk from clk_wiz_0 Clk_Out2 (24.576 MHz)", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-004", "edge_type": "DEPENDS_ON", "from": "COMP-A-fifo_generator_0", "to": "COMP-A-mig_7series_0", "confidence": "HIGH", "note": "wr_clk from MIG ui_clk (~81 MHz)", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-005", "edge_type": "DEPENDS_ON", "from": "COMP-A-axi_dma_0", "to": "COMP-A-mig_7series_0", "confidence": "HIGH", "note": "M_AXI_MM2S + M_AXI_S2MM → axi_interconnect_0 → MIG", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-006", "edge_type": "DEPENDS_ON", "from": "COMP-A-axis2fifo_0", "to": "COMP-A-axi_dma_0", "confidence": "HIGH", "note": "Receives AXI-Stream from DMA MM2S", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-007", "edge_type": "DEPENDS_ON", "from": "COMP-A-tone_generator_0", "to": "COMP-A-axi_dma_0", "confidence": "MEDIUM", "note": "Sends AXI-Stream to DMA S2MM (disabled in SW)", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-008", "edge_type": "DEPENDS_ON", "from": "COMP-A-clk_wiz_0", "to": "COMP-A-mig_7series_0", "confidence": "HIGH", "note": "Clk_Out1 (140.625 MHz) → MIG sys_clk_i", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-009", "edge_type": "DEPENDS_ON", "from": "COMP-A-rst_mig_7series_0_81M", "to": "COMP-A-mig_7series_0", "confidence": "HIGH", "note": "MIG ui_clk_sync_rst → ext_reset_in; mmcm_locked → dcm_locked", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-010", "edge_type": "DEPENDS_ON", "from": "COMP-A-helloworld", "to": "COMP-A-axi_dma_0", "confidence": "HIGH", "note": "SW controls DMA via AXI-Lite register interface", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-011", "edge_type": "DEPENDS_ON", "from": "COMP-A-helloworld", "to": "COMP-A-GPIO_IN", "confidence": "HIGH", "note": "SW reads buttons/switches via GPIO", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-012", "edge_type": "DEPENDS_ON", "from": "COMP-A-helloworld", "to": "COMP-A-axi_uartlite_0", "confidence": "HIGH", "note": "SW receives WAV via UART", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-013", "edge_type": "DEPENDS_ON", "from": "COMP-B-microblaze_0", "to": "COMP-B-clk_wiz_0", "confidence": "HIGH", "note": "Clock distribution", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-014", "edge_type": "DEPENDS_ON", "from": "COMP-B-microblaze_0", "to": "COMP-B-rst_clk_wiz_0_100M", "confidence": "HIGH", "note": "mb_reset signal", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-015", "edge_type": "DEPENDS_ON", "from": "COMP-B-microblaze_0", "to": "COMP-B-lmb_subsystem", "confidence": "HIGH", "note": "LMB instruction + data bus", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-016", "edge_type": "DEPENDS_ON", "from": "COMP-B-rst_clk_wiz_0_100M", "to": "COMP-B-clk_wiz_0", "confidence": "HIGH", "note": "locked → dcm_locked", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-017", "edge_type": "DEPENDS_ON", "from": "COMP-B-microblaze_0_axi_periph", "to": "COMP-B-microblaze_0", "confidence": "HIGH", "note": "MicroBlaze M_AXI_DP → Interconnect", "provenance": { "phase": 2 } },
+    { "edge_id": "E-DEP-018", "edge_type": "DEPENDS_ON", "from": "COMP-B-axi_gpio_0", "to": "COMP-B-microblaze_0_axi_periph", "confidence": "HIGH", "note": "AXI GPIO slave on interconnect", "provenance": { "phase": 2 } },
+
+    // ============================================================
+    // PHASE 4: IMPLEMENTS EDGES (REQ → COMPONENT)
+    // ============================================================
+    {
+      "edge_id": "M-001", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-axis2fifo_0", "to": "DMA-REQ-L2-001",
+      "match_id": "M-001", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement explicitly names 'axis2fifo' component", "Component source_file matches implementing_component field"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-002", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-fifo2audpwm_0", "to": "DMA-REQ-L2-002",
+      "match_id": "M-002", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement explicitly names 'fifo2audpwm' component", "24.576 MHz clock domain verified in component"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-003", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-tone_generator_0", "to": "DMA-REQ-L2-003",
+      "match_id": "M-003", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement names 'tone_generator' component", "Component exists and is instantiated in BD"],
+      "unmatched_aspects": ["axis_tlast=1 bug means DMA burst does not work → functional requirement NOT met", "16-bit output vs 8-bit expected → bit width mismatch"],
+      "issue_refs": ["ISSUE-A-002"],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-004", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-fifo_generator_0", "to": "DMA-REQ-L2-004",
+      "match_id": "M-004", "match_strategy": "exact_name + constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement names 'fifo_generator' IP", "independent_clocks mode matches CDC requirement", "4096 depth matches constraint"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [1, 5] }
+    },
+    {
+      "edge_id": "M-005", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-axi_uartlite_0", "to": "DMA-REQ-L2-005",
+      "match_id": "M-005", "match_strategy": "exact_name + constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement names 'axi_uartlite_0'", "230400 baud matches constraint"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [1, 5] }
+    },
+    {
+      "edge_id": "M-006", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-helloworld", "to": "DMA-REQ-L2-005",
+      "match_id": "M-006", "match_strategy": "exact_name + semantic",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement mentions 'recv_wav, play_wav' functions matching helloworld.c"],
+      "unmatched_aspects": ["Only 96 kHz sample rate supported — ISSUE-A-003"],
+      "provenance": { "phase": 4, "strategy": [1, 2] }
+    },
+    {
+      "edge_id": "M-007", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-GPIO_IN", "to": "DMA-REQ-L2-006",
+      "match_id": "M-007", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement names GPIO_IN, 5-bit buttons + 16-bit switches dual channel"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-008", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-GPIO_OUT", "to": "DMA-REQ-L2-006",
+      "match_id": "M-008", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement names GPIO_OUT, LED output channels"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-009", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-helloworld", "to": "DMA-REQ-L2-007",
+      "match_id": "M-009", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement explicitly names 'helloworld.c::dma_sw_tone_gen()'"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-010", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-clk_wiz_0", "to": "DMA-REQ-L2-008",
+      "match_id": "M-010", "match_strategy": "exact_name + constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement names 'clk_wiz_0'", "140.625 MHz and 24.576 MHz outputs match constraints"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [1, 5] }
+    },
+    {
+      "edge_id": "M-011", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-rst_mig_7series_0_81M", "to": "DMA-REQ-L2-009",
+      "match_id": "M-011", "match_strategy": "exact_name + constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement names 'rst_mig_7series_0_81M'", "MIG sync_rst connection matches"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [1, 5] }
+    },
+    {
+      "edge_id": "M-012", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-mdm_1", "to": "DMA-REQ-L2-010",
+      "match_id": "M-012", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement names 'mdm_1'"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-013", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-microblaze_0_axi_intc", "to": "DMA-REQ-L2-011",
+      "match_id": "M-013", "match_strategy": "exact_name",
+      "confidence": "MEDIUM",
+      "match_evidence": ["Requirement names 'microblaze_0_axi_intc'", "INTC hardware present"],
+      "unmatched_aspects": ["Software does NOT use interrupt handler — DMA-DEC-005 documents this as intentional decision"],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-014", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-microblaze_0", "to": "DMA-REQ-L1-003",
+      "match_id": "M-014", "match_strategy": "exact_name + semantic",
+      "confidence": "HIGH",
+      "match_evidence": ["MicroBlaze implements processing subsystem", "I+D cache enabled matches constraint"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [1, 2] }
+    },
+    {
+      "edge_id": "M-015", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-axi_dma_0", "to": "DMA-REQ-L1-001",
+      "match_id": "M-015", "match_strategy": "exact_name + constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["DMA is primary data path component", "simple mode (no SG) matches DMA-REQ-L1-001 constraint"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [1, 5] }
+    },
+    {
+      "edge_id": "M-016", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-mig_7series_0", "to": "DMA-REQ-L1-004",
+      "match_id": "M-016", "match_strategy": "semantic",
+      "confidence": "HIGH",
+      "match_evidence": ["MIG DDR2 is infrastructure component providing ui_clk and DDR2 memory"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 2 }
+    },
+    {
+      "edge_id": "M-017", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-axis2fifo_0", "to": "DMA-REQ-L1-006",
+      "match_id": "M-017", "match_strategy": "structural_traversal + semantic",
+      "confidence": "MEDIUM",
+      "match_evidence": ["axis2fifo implements AXI-Stream handshake portion of Signal Path ister", "tready=~fifo_full implements backpressure as required"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [3, 2] }
+    },
+    {
+      "edge_id": "M-018", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-fifo2audpwm_0", "to": "DMA-REQ-L1-006",
+      "match_id": "M-018", "match_strategy": "structural_traversal + semantic",
+      "confidence": "MEDIUM",
+      "match_evidence": ["fifo2audpwm implements PWM enable signal control (aud_en=FIFO_empty) per Signal Path requirement"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [3, 2] }
+    },
+    {
+      "edge_id": "M-019", "edge_type": "IMPLEMENTS",
+      "from": "COMP-A-fifo_generator_0", "to": "DMA-REQ-L1-006",
+      "match_id": "M-019", "match_strategy": "semantic + constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["FIFO implements CDC with gray-code pointers as required by Signal Path ister"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [2, 5] }
+    },
+    // PROJECT-B IMPLEMENTS edges
+    {
+      "edge_id": "M-101", "edge_type": "IMPLEMENTS",
+      "from": "COMP-B-axi_gpio_wrapper", "to": "AXI-REQ-L2-001",
+      "match_id": "M-101", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement names 'axi_gpio_wrapper' component", "AXI tie-off pattern matches acceptance criteria"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-102", "edge_type": "IMPLEMENTS",
+      "from": "COMP-B-simple_top", "to": "AXI-REQ-L2-002",
+      "match_id": "M-102", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["Requirement names 'simple_top' component"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-103", "edge_type": "IMPLEMENTS",
+      "from": "COMP-B-clk_wiz_0", "to": "AXI-REQ-L2-003",
+      "match_id": "M-103", "match_strategy": "exact_name + constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["Clock Wizard 100→100 MHz match", "MMCME2_ADV confirmed in synthesis"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [1, 5] }
+    },
+    {
+      "edge_id": "M-104", "edge_type": "IMPLEMENTS",
+      "from": "COMP-B-lmb_subsystem", "to": "AXI-REQ-L2-004",
+      "match_id": "M-104", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["5 LMB netlists confirmed in synthesis", "2 BRAM36 confirmed"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-105", "edge_type": "IMPLEMENTS",
+      "from": "COMP-B-microblaze_0_axi_periph", "to": "AXI-REQ-L2-005",
+      "match_id": "M-105", "match_strategy": "exact_name + constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["1M×1S AXI Interconnect matches requirement", "0x40000000 address verified"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [1, 5] }
+    },
+    {
+      "edge_id": "M-106", "edge_type": "IMPLEMENTS",
+      "from": "COMP-B-rst_clk_wiz_0_100M", "to": "AXI-REQ-L2-006",
+      "match_id": "M-106", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["Reset controller confirmed in synthesis", "PLL lock → reset release connection verified"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-107", "edge_type": "IMPLEMENTS",
+      "from": "COMP-B-mdm_1", "to": "AXI-REQ-L2-007",
+      "match_id": "M-107", "match_strategy": "exact_name",
+      "confidence": "HIGH",
+      "match_evidence": ["MDM confirmed in synthesis", "C_USE_UART=1 matches MDM UART requirement"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 1 }
+    },
+    {
+      "edge_id": "M-108", "edge_type": "IMPLEMENTS",
+      "from": "COMP-B-microblaze_0", "to": "AXI-REQ-L1-002",
+      "match_id": "M-108", "match_strategy": "exact_name + semantic",
+      "confidence": "HIGH",
+      "match_evidence": ["MicroBlaze v11.0 confirmed", "AXI master port enables GPIO access"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [1, 2] }
+    },
+    {
+      "edge_id": "M-109", "edge_type": "IMPLEMENTS",
+      "from": "COMP-B-axi_gpio_0", "to": "AXI-REQ-L1-001",
+      "match_id": "M-109", "match_strategy": "exact_name + constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["AXI GPIO confirmed in synthesis", "8-bit output, 0x40000000 matches constraints"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [1, 5] }
+    },
+    {
+      "edge_id": "M-110", "edge_type": "IMPLEMENTS",
+      "from": "COMP-B-axi_gpio_wrapper", "to": "AXI-REQ-L1-005",
+      "match_id": "M-110", "match_strategy": "semantic",
+      "confidence": "MEDIUM",
+      "match_evidence": ["axi_gpio_wrapper demonstrates AXI tie-off signal pattern per Signal Path requirement"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": 2 }
+    },
+    {
+      "edge_id": "M-111", "edge_type": "IMPLEMENTS",
+      "from": "COMP-B-rst_clk_wiz_0_100M", "to": "AXI-REQ-L1-005",
+      "match_id": "M-111", "match_strategy": "semantic + constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["PLL lock → reset release implements Signal Path reset chain requirement"],
+      "unmatched_aspects": [],
+      "provenance": { "phase": 4, "strategy": [2, 5] }
+    },
+
+    // ============================================================
+    // PHASE 4: VERIFIED_BY EDGES (Evidence → Requirement)
+    // ============================================================
+    {
+      "edge_id": "VB-001", "edge_type": "VERIFIED_BY",
+      "from": "DMA-REQ-L2-001", "to": "EVID-A-001",
+      "match_id": "VB-001", "match_strategy": "evidence_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["axis2fifo.v:35 directly implements '32-bit AXI-Stream verisinin alt 16 biti FIFO'ya yazılır'"],
+      "provenance": { "phase": 4, "strategy": 4 }
+    },
+    {
+      "edge_id": "VB-002", "edge_type": "VERIFIED_BY",
+      "from": "DMA-REQ-L2-001", "to": "EVID-A-006",
+      "match_id": "VB-002", "match_strategy": "evidence_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["axis2fifo.v:33 implements backpressure requirement"],
+      "provenance": { "phase": 4, "strategy": 4 }
+    },
+    {
+      "edge_id": "VB-003", "edge_type": "VERIFIED_BY",
+      "from": "DMA-REQ-L2-002", "to": "EVID-A-002",
+      "match_id": "VB-003", "match_strategy": "evidence_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["fifo2audpwm.v:37 implements 256-level PWM requirement"],
+      "provenance": { "phase": 4, "strategy": 4 }
+    },
+    {
+      "edge_id": "VB-004", "edge_type": "VERIFIED_BY",
+      "from": "DMA-REQ-L2-002", "to": "EVID-A-007",
+      "match_id": "VB-004", "match_strategy": "evidence_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["fifo2audpwm.v:23-26 implements aud_en=0 when FIFO empty requirement"],
+      "provenance": { "phase": 4, "strategy": 4 }
+    },
+    {
+      "edge_id": "VB-005", "edge_type": "VERIFIED_BY",
+      "from": "DMA-REQ-L2-003", "to": "EVID-A-003",
+      "match_id": "VB-005", "match_strategy": "evidence_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["tone_generator.v:69 axis_tlast=1 is the verified bug causing non-compliance"],
+      "compliance": "FAIL",
+      "provenance": { "phase": 4, "strategy": 4 }
+    },
+    {
+      "edge_id": "VB-006", "edge_type": "VERIFIED_BY",
+      "from": "DMA-REQ-L0-001", "to": "EVID-A-008",
+      "match_id": "VB-006", "match_strategy": "evidence_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["README confirms HW tone gen not working — partial L0 non-compliance"],
+      "compliance": "PARTIAL",
+      "provenance": { "phase": 4, "strategy": 4 }
+    },
+    {
+      "edge_id": "VB-101", "edge_type": "VERIFIED_BY",
+      "from": "AXI-REQ-L0-001", "to": "EVID-B-001",
+      "match_id": "VB-101", "match_strategy": "evidence_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["utilization_summary.txt: synthesis passed, WNS > 0 ns, <5% resource use (1.05% LUT)"],
+      "compliance": "PASS",
+      "provenance": { "phase": 4, "strategy": 4 }
+    },
+    {
+      "edge_id": "VB-102", "edge_type": "VERIFIED_BY",
+      "from": "AXI-REQ-L2-001", "to": "EVID-B-002",
+      "match_id": "VB-102", "match_strategy": "evidence_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["axi_gpio_wrapper.v:13-31 implements AXI tie-off pattern as required"],
+      "compliance": "PASS",
+      "provenance": { "phase": 4, "strategy": 4 }
+    },
+
+    // ============================================================
+    // PHASE 4: CONSTRAINED_BY EDGES
+    // ============================================================
+    {
+      "edge_id": "CB-001", "edge_type": "CONSTRAINED_BY",
+      "from": "COMP-A-fifo2audpwm_0", "to": "CONST-A-CLK-003",
+      "match_id": "CB-001", "match_strategy": "constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["fifo2audpwm_0 runs on 24.576 MHz as defined in constraint"],
+      "provenance": { "phase": 4, "strategy": 5 }
+    },
+    {
+      "edge_id": "CB-002", "edge_type": "CONSTRAINED_BY",
+      "from": "COMP-A-axi_dma_0", "to": "CONST-A-DMA-001",
+      "match_id": "CB-002", "match_strategy": "constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["DMA burst size 256 bytes matches constraint"],
+      "provenance": { "phase": 4, "strategy": 5 }
+    },
+    {
+      "edge_id": "CB-003", "edge_type": "CONSTRAINED_BY",
+      "from": "COMP-A-pwm_audio_bus", "to": "CONST-A-PIN-001",
+      "match_id": "CB-003", "match_strategy": "constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["PWM pin A11 is active constraint in XDC"],
+      "provenance": { "phase": 4, "strategy": 5 }
+    },
+    {
+      "edge_id": "CB-004", "edge_type": "CONSTRAINED_BY",
+      "from": "COMP-B-axi_gpio_0", "to": "CONST-B-ADDR-001",
+      "match_id": "CB-004", "match_strategy": "constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["0x40000000 base address matches AXI GPIO constraint"],
+      "provenance": { "phase": 4, "strategy": 5 }
+    },
+    {
+      "edge_id": "CB-005", "edge_type": "CONSTRAINED_BY",
+      "from": "COMP-B-clk_wiz_0", "to": "CONST-B-CLK-001",
+      "match_id": "CB-005", "match_strategy": "constraint_binding",
+      "confidence": "HIGH",
+      "match_evidence": ["R4 pin, 100 MHz, period 10 ns matches clock constraint"],
+      "provenance": { "phase": 4, "strategy": 5 }
+    },
+
+    // ============================================================
+    // PHASE 5: CROSS-PROJECT EDGES
+    // ============================================================
+    {
+      "edge_id": "XP-001", "edge_type": "ANALOGOUS_TO",
+      "from": "COMP-A-clk_wiz_0", "to": "COMP-B-clk_wiz_0",
+      "confidence": "HIGH",
+      "note": "Both use Xilinx Clocking Wizard v6.0 for clock generation. PROJECT-A: multi-output (140.625+24.576 MHz). PROJECT-B: single output (100 MHz). Same PLL lock → reset pattern.",
+      "provenance": { "phase": 5 }
+    },
+    {
+      "edge_id": "XP-002", "edge_type": "ANALOGOUS_TO",
+      "from": "COMP-A-rst_mig_7series_0_81M", "to": "COMP-B-rst_clk_wiz_0_100M",
+      "confidence": "HIGH",
+      "note": "Both use proc_sys_reset v5.0. PROJECT-A: MIG-based (DDR2 calibration gating). PROJECT-B: PLL-lock based. Same pattern, different reset trigger.",
+      "provenance": { "phase": 5 }
+    },
+    {
+      "edge_id": "XP-003", "edge_type": "ANALOGOUS_TO",
+      "from": "COMP-A-mdm_1", "to": "COMP-B-mdm_1",
+      "confidence": "HIGH",
+      "note": "Both use MDM v3.2 for JTAG debug. PROJECT-B adds C_USE_UART=1 for serial console without external UART IP.",
+      "provenance": { "phase": 5 }
+    },
+    {
+      "edge_id": "XP-004", "edge_type": "ANALOGOUS_TO",
+      "from": "COMP-A-microblaze_0", "to": "COMP-B-microblaze_0",
+      "confidence": "HIGH",
+      "note": "Both use MicroBlaze. PROJECT-A v10.0 with I+D cache (DDR2 performance). PROJECT-B v11.0 without cache (8KB BRAM, no DDR). Different versions, same soft-processor role.",
+      "provenance": { "phase": 5 }
+    },
+    {
+      "edge_id": "XP-005", "edge_type": "REUSES_PATTERN",
+      "from": "PAT-B-005", "to": "PAT-A-004",
+      "confidence": "HIGH",
+      "note": "PLL Lock → Reset Release pattern reused in PROJECT-B from standard FPGA design practice. PROJECT-A variant uses MIG ui_clk_sync_rst as additional reset trigger.",
+      "provenance": { "phase": 5 }
+    },
+    {
+      "edge_id": "XP-006", "edge_type": "ANALOGOUS_TO",
+      "from": "COMP-A-GPIO_IN", "to": "COMP-B-axi_gpio_0",
+      "confidence": "HIGH",
+      "note": "Both use AXI GPIO IP. PROJECT-A: dual-channel, 5+16 bit I/O. PROJECT-B: 8-bit output only. Same IP, different config scope.",
+      "provenance": { "phase": 5 }
+    }
+  ],
+
+  // ============================================================
+  // PHASE 5: COVERAGE GAP ANALYSIS
+  // ============================================================
+  "coverage_gaps": [
+    {
+      "gap_id": "GAP-A-001",
+      "project": "PROJECT-A",
+      "type": "REQUIREMENT_PARTIAL_MATCH",
+      "severity": "high",
+      "requirement": "DMA-REQ-L2-003",
+      "title": "HW Tone Generator ister var ama component çalışmıyor",
+      "description": "tone_generator_0 bileşeni var ve DMA-REQ-L2-003'ü implements ediyor ama fonksiyonel gereksinimler karşılanmıyor. axis_tlast=1 hatası (EVID-A-003) ve 16-bit/8-bit genişlik uyumsuzluğu nedeniyle 'should' öncelikli ister implement edilmiş sayılamaz.",
+      "component_present": true,
+      "functional_compliance": false,
+      "issue_refs": ["ISSUE-A-002"],
+      "remediation": "tone_generator.v'de axis_tlast ve bit genişliği düzeltilmeli; helloworld.c DEMO_MODE_HW_TONE_GEN case aktifleştirilmeli"
+    },
+    {
+      "gap_id": "GAP-B-001",
+      "project": "PROJECT-B",
+      "type": "PLANNED_NOT_IMPLEMENTED",
+      "severity": "info",
+      "requirement": "AXI-REQ-L0-001 (Tam Sistem — Seviye 3)",
+      "title": "Tam Sistem örneği (MicroBlaze + AXI BRAM + GPIO) tamamlanmamış",
+      "description": "README seviye 3'ü '⏳ Geliştirilmekte' olarak işaretliyor. create_axi_auto.tcl ve create_axi_with_xdc.tcl stabil değil — block automation timeout sorunu. Acceptance criteria 'kademeli ilerleme' için Seviye 3 eksik.",
+      "component_present": false,
+      "functional_compliance": false,
+      "issue_refs": ["ISSUE-B-003"],
+      "remediation": "Block automation timeout'u aşmak için manuel bd connection script yazılmalı"
+    }
+  ],
+
+  // ============================================================
+  // PHASE 5: ORPHAN COMPONENT ANALYSIS
+  // ============================================================
+  "orphan_components": [
+    {
+      "orphan_id": "ORP-A-001",
+      "project": "PROJECT-A",
+      "component": "COMP-A-xlconcat_0",
+      "title": "xlconcat_0 — Interrupt concat, yazılım kullanmıyor",
+      "description": "Bileşen mevcut ve DMA-REQ-L2-011 kapsamında INTC'ye bağlı. Ancak yazılımın hiçbir zaman interrupt handler çağırmaması nedeniyle işlevsel olarak 'orphan' görünüyor. Formal olarak DMA-DEC-005 kararıyla justifiye edilmiş.",
+      "formal_orphan": false,
+      "note": "DMA-DEC-005 (PARSE_UNCERTAIN decision) bu durumu açıklıyor. Coverage değil decision."
+    },
+    {
+      "orphan_id": "ORP-A-002",
+      "project": "PROJECT-A",
+      "component": "COMP-A-xlconcat_1",
+      "title": "xlconcat_1 — GPIO+UART interrupt concat, yazılım kullanmıyor",
+      "description": "ORP-A-001 ile aynı durum. GPIO ve UART interrupt'larını INTC'ye bağlıyor ama yazılım polling kullanıyor.",
+      "formal_orphan": false,
+      "note": "DMA-DEC-005 kapsamında."
+    }
+  ],
+
+  // ============================================================
+  // PHASE 5: CONSTRAINT / TIMING CONFLICT ANALYSIS
+  // ============================================================
+  "constraint_conflicts": [
+    {
+      "conflict_id": "CONFLICT-A-001",
+      "project": "PROJECT-A",
+      "severity": "critical",
+      "title": "FPGA Part Çelişkisi: design_1.tcl/project_info.tcl → 50T, ister/README → 100T",
+      "conflict_type": "fpga_part_mismatch",
+      "detail": {
+        "tcl_part": "xc7a50ticsg324-1L (Nexys A7-50T)",
+        "intended_part": "xc7a100tcsg324-1 (Nexys A7-100T)",
+        "tcl_board_part": "digilentinc.com:nexys-a7-50t:part0:1.0",
+        "intended_board": "Digilent Nexys A7-100T",
+        "xdc_file": "Nexys-A7-100T-Master.xdc (correct for 100T)",
+        "readme": "Nexys A7-100T (correct)"
+      },
+      "impact": [
+        "50T has 50K LUTs vs 100T's 101K — MIG DDR2 + MicroBlaze + DMA may exceed 50T resources",
+        "50T DDR2 timing constraints may differ from 100T PHY",
+        "Synthesis will target wrong device — bitstream incompatible with A7-100T board"
+      ],
+      "root_cause": "Likely the project was initially developed for 50T and renamed for 100T, but TCL scripts were not updated",
+      "evidence_refs": ["EVID-A-009", "EVID-A-010"],
+      "remediation": "Update project_info.tcl line 4 and design_1.tcl line 53 to xc7a100tcsg324-1 and board part nexys-a7-100t"
+    },
+    {
+      "conflict_id": "CONFLICT-B-001",
+      "project": "PROJECT-B",
+      "severity": "low",
+      "title": "XDC Duplicate Clock Definition",
+      "conflict_type": "timing_constraint_conflict",
+      "detail": "CRITICAL WARNING [Constraints 18-1056]: sys_clk_pin overrides sys_clock. Two create_clock directives for the same pin.",
+      "impact": "Non-blocking — final timing passes. But XDC is unclear and could cause issues if design evolves.",
+      "evidence_refs": ["EVID-B-003"],
+      "remediation": "Remove duplicate clock constraint"
+    }
+  ],
+
+  // ============================================================
+  // PHASE 5: SPECIAL ANALYSIS ITEMS
+  // ============================================================
+  "special_analyses": [
+    {
+      "analysis_id": "SA-001",
+      "topic": "FPGA Part Tutarsızlığı Doğrulama (PROJECT-A)",
+      "finding": "DOĞRULANDI — KRİTİK",
+      "evidence": [
+        "project_info.tcl:4 — part = xc7a50ticsg324-1L (50T)",
+        "design_1.tcl:53 — create_project -part xc7a50ticsg324-1L (50T)",
+        "design_1.tcl:54 — BOARD_PART = digilentinc.com:nexys-a7-50t:part0:1.0 (50T)",
+        "Nexys-A7-100T-Master.xdc — XDC for 100T (correct)",
+        "README.md — 'Nexys A7-100T' (correct)",
+        "FPGA_RAG_ISTER_DOKUMANI_v2.txt PROJECT-A — fpga_part: xc7a100tcsg324-1 (correct)"
+      ],
+      "conclusion": "Two TCL files (project_info.tcl and design_1.tcl) target the 50T device while all other artifacts (XDC, README, requirements) target 100T. CONFLICT-A-001 severity=critical is correct. This is a reproducible build-time failure if scripts are used."
+    },
+    {
+      "analysis_id": "SA-002",
+      "topic": "tone_generator PARSE_UNCERTAIN Değerlendirmesi",
+      "finding": "MİMARİ KURALLARA GÖRE DEĞERLENDİRME: ISSUE (PARSE_UNCERTAIN Geçerli)",
+      "evidence": [
+        "tone_generator.v:69 — axis_tlast = 1'b1 (sabit 1, her cycle TLAST aktif)",
+        "tone_generator.v:51 — axis_tvalid = 1 (always valid, rate control yok)",
+        "helloworld.c:386 — case DEMO_MODE_HW_TONE_GEN: break; (software disabled)",
+        "README.md — 'Hardware Tone Generation functionality is not currently working'",
+        "TODO comment (tone_generator.v:72) — 'create AXI interface for configuration'"
+      ],
+      "architecture_rule_applied": "v2 Architecture: PARSE_UNCERTAIN = LLM'in mühendis açıklaması OLMAYAN kısımları için kullanılır. Buradaki PARSE_UNCERTAIN WHY disabled (çalışmama nedeni) için — fiziksel durum (çalışmıyor) kesin kanıtla doğrulanmış.",
+      "parse_uncertain_scope": "PARSE_UNCERTAIN yalnızca 'neden bu bug bırakıldı?' sorusuna uygulanır. Bu, mühendis tarafından açıkça belgelenmemiş. 'Çalışmıyor' gerçeği ise README ile kesin olarak doğrulanmış (PARSE_UNCERTAIN değil, HIGH confidence).",
+      "classification": "ISSUE-A-002 (severity=high) doğrudur. tone_generator'ın tasarımdaki varlığı bir hata değil, eksik/kırık bir özellik. DMA-REQ-L2-003 (priority=should) için partial implementation var, functional compliance yok.",
+      "verdict": "PARSE_UNCERTAIN ISTER DOC'TAKİ YORUM DOĞRU. Mimari kurallarla çelişen bir durum yok."
+    },
+    {
+      "analysis_id": "SA-003",
+      "topic": "Interrupt Altyapısı: Coverage Gap mı, Decision mı?",
+      "finding": "KARAR (DECISION) — Coverage Gap DEĞİL",
+      "evidence": [
+        "microblaze_0_axi_intc: hardware installed and connected",
+        "xlconcat_0: DMA MM2S + S2MM interrupts connected",
+        "xlconcat_1: GPIO_IN + GPIO_OUT + UART interrupts connected",
+        "helloworld.c: polling-based main loop, no interrupt handler",
+        "DMA-DEC-005: explicitly documents this as an architectural decision"
+      ],
+      "reasoning": [
+        "1. Hardware requirement DMA-REQ-L2-011 is FULLY SATISFIED — INTC hardware present and correctly wired",
+        "2. The software NOT using interrupts is documented as DMA-DEC-005 (architectural decision)",
+        "3. DMA-DEC-005 is PARSE_UNCERTAIN for motivation, but the decision EXISTS (it's documented in ISTER doc)",
+        "4. A Coverage Gap means 'no component implements this requirement' — here the component IS present",
+        "5. An Orphan Component means 'no requirement matches this component' — DMA-REQ-L2-011 DOES match",
+        "6. The practical consequence (polling, CPU load) is captured in ISSUE-A-006 (severity=low)"
+      ],
+      "classification": "DECISION (DMA-DEC-005) + ISSUE (ISSUE-A-006). NOT a Coverage Gap.",
+      "v2_architecture_alignment": "v2 mimarisi mühendis kararlarını DECISION node olarak saklar. Motivasyonu bilinmese de (PARSE_UNCERTAIN) kararın kendisi belgelenmiş ve geçerli."
+    },
+    {
+      "analysis_id": "SA-004",
+      "topic": "axi_example Educational Pattern Node'larının Yeterliliği",
+      "finding": "YETERLİ — ancak 2 eksik pattern önerilmekte",
+      "current_patterns": [
+        "PAT-B-001: AXI Slave Tie-off (very_high educational value)",
+        "PAT-B-002: Kademeli Eğitim / Graduated Complexity",
+        "PAT-B-003: CLI-First TCL Batch Automation",
+        "PAT-B-004: Block Design Automation (apply_bd_automation)",
+        "PAT-B-005: PLL Lock → Reset Release"
+      ],
+      "adequacy_assessment": {
+        "AXI_protocol_teaching": "ADEQUATE — PAT-B-001 (tie-off) + PAT-B-003 (automation) cover AXI protocol understanding",
+        "MicroBlaze_ecosystem": "ADEQUATE — PAT-B-004 (block automation) covers MicroBlaze setup pattern",
+        "reproducibility": "ADEQUATE — PAT-B-003 covers TCL reproducibility",
+        "reset_clock_fundamentals": "ADEQUATE — PAT-B-005 covers PLL/reset fundamentals"
+      },
+      "missing_patterns": [
+        {
+          "pat_id": "PAT-B-006_PROPOSED",
+          "name": "AXI Address Map Explicit Assignment",
+          "description": "assign_bd_address pattern for explicit AXI address assignment in TCL. Critical for multi-peripheral systems.",
+          "source": "add_axi_gpio.tcl",
+          "educational_value": "high",
+          "why_missing": "Not explicitly captured but present in add_axi_gpio.tcl"
+        },
+        {
+          "pat_id": "PAT-B-007_PROPOSED",
+          "name": "Out-of-Context Synthesis",
+          "description": "run_synthesis.tcl demonstrates OOC synthesis for faster iteration. Educational for understanding synthesis modes.",
+          "source": "run_synthesis.tcl + SYNTHESIS_RESULTS.md",
+          "educational_value": "medium",
+          "why_missing": "Not captured in current ISTER doc patterns"
+        }
+      ],
+      "verdict": "Mevcut 5 pattern yeterli eğitim değeri sağlıyor. 2 ek pattern (PAT-B-006, PAT-B-007) önerisi ISTER dokümanında ekleme olarak listelenmiş."
+    },
+    {
+      "analysis_id": "SA-005",
+      "topic": "Signal Path Ekseninin Her İki Projede Tam Kapsanması",
+      "finding": "KISMİ KAPSAMA — Her iki projede Signal Path eklendi (v2.0), ancak bazı noktalar eksik",
+      "project_a_signal_path": {
+        "coverage_items": [
+          { "item": "Clock distribution (100 MHz → 140.625 + 24.576 MHz)", "status": "COVERED", "evidence": "COMP-A-clk_wiz_0, DMA-REQ-L2-008" },
+          { "item": "Reset chain (MIG sync_rst → proc_sys_reset → peripheral_aresetn)", "status": "COVERED", "evidence": "COMP-A-rst_mig_7series_0_81M, DMA-REQ-L2-009" },
+          { "item": "AXI-Stream handshake (tvalid/tready/tlast/tkeep)", "status": "COVERED", "evidence": "COMP-A-axis2fifo_0, DMA-REQ-L1-006" },
+          { "item": "FIFO CDC gray-code pointer sync", "status": "COVERED", "evidence": "COMP-A-fifo_generator_0, DMA-REQ-L2-004" },
+          { "item": "FIFO backpressure (full→tready, empty→aud_en)", "status": "COVERED", "evidence": "EVID-A-006, EVID-A-007" },
+          { "item": "Interrupt routing (xlconcat → INTC → MicroBlaze)", "status": "COVERED_HW_ONLY", "evidence": "COMP-A-xlconcat_0, xlconcat_1, DMA-REQ-L2-011", "gap": "SW handler missing (DMA-DEC-005)" },
+          { "item": "Signal timing verification (WNS)", "status": "NOT_COVERED", "gap": "No timing report available — implementation not run, only synthesis" }
+        ],
+        "overall": "SUBSTANTIALLY_COVERED — all major signal paths documented. Timing evidence missing."
+      },
+      "project_b_signal_path": {
+        "coverage_items": [
+          { "item": "Clock distribution (100 MHz PLL → BUFG → fabric)", "status": "COVERED", "evidence": "COMP-B-clk_wiz_0, AXI-REQ-L2-003, EVID-B-001 (MMCME2_ADV confirmed)" },
+          { "item": "Reset chain (PLL locked → proc_sys_reset → aresetn + mb_reset)", "status": "COVERED", "evidence": "COMP-B-rst_clk_wiz_0_100M, AXI-REQ-L2-006" },
+          { "item": "AXI-Lite handshake protocol (master → interconnect → slave)", "status": "COVERED", "evidence": "COMP-B-microblaze_0_axi_periph, COMP-B-axi_gpio_0, AXI-REQ-L1-005" },
+          { "item": "AXI tie-off signal pattern (standalone)", "status": "COVERED", "evidence": "COMP-B-axi_gpio_wrapper, PAT-B-001, EVID-B-002" },
+          { "item": "Interrupt signal path", "status": "NOT_PRESENT", "note": "No INTC in PROJECT-B — intentional (educational scope). Not a gap." },
+          { "item": "GPIO output signal path (GPIO register → LED pin)", "status": "COVERED", "evidence": "COMP-B-axi_gpio_0, CONST-B-PIN-LED0..7, AXI-REQ-L1-001" },
+          { "item": "Timing verification (WNS)", "status": "COVERED", "evidence": "EVID-B-001: synthesis WNS > 0 ns confirmed" }
+        ],
+        "overall": "WELL_COVERED — single clock domain simplifies Signal Path. WNS verified via synthesis."
+      }
+    }
+  ],
+
+  // ============================================================
+  // PHASE 6: DOCUMENT UPDATE LOG (Changes to ISTER doc)
+  // ============================================================
+  "document_updates": {
+    "target_doc": "FPGA_RAG_ISTER_DOKUMANI_v2.txt",
+    "update_version": "2.1",
+    "update_date": "2026-02-23",
+    "updates": [
+      {
+        "update_id": "UPD-001",
+        "section": "PROJECT-A Metadata / FPGA Part",
+        "type": "CORRECTION",
+        "description": "CONFLICT-A-001 doğrulama notu eklendi: project_info.tcl ve design_1.tcl'in xc7a50ticsg324-1L kullandığı ve bunun bir kritik tutarsızlık olduğu kesin olarak doğrulandı.",
+        "change": "PROJECT-A PROJECT node'unda fpga_part_actual_tcl: xc7a50ticsg324-1L ve fpga_part_intended: xc7a100tcsg324-1 ayrımı netleştirildi. ISSUE-A-001 severity=critical olarak korundu.",
+        "v2_principle": "Evidence-based fact — no speculation"
+      },
+      {
+        "update_id": "UPD-002",
+        "section": "DMA-REQ-L2-003 (tone_generator) / PARSE_UNCERTAIN scope",
+        "type": "CLARIFICATION",
+        "description": "PARSE_UNCERTAIN etiketinin kapsamı netleştirildi: 'çalışmıyor' gerçeği HIGH confidence ile doğrulanmış (README+code). PARSE_UNCERTAIN yalnızca 'WHY disabled' sorusuna uygulanır (mühendis belgesi yok).",
+        "change": "DMA-REQ-L2-003 node'unda parse_flag açıklaması PARSE_UNCERTAIN_WHY_DISABLED olarak güncellendi. 'Çalışmıyor' durumu ISSUE-A-002 (HIGH confidence) olarak ayrı tutuldu.",
+        "v2_principle": "PARSE_UNCERTAIN = engineer not documented rationale. Not = unknown facts."
+      },
+      {
+        "update_id": "UPD-003",
+        "section": "DMA-DEC-005 + ISSUE-A-006 (Interrupt altyapısı)",
+        "type": "CLASSIFICATION_CONFIRMED",
+        "description": "Interrupt altyapısının yazılımda kullanılmaması: DECISION (DMA-DEC-005) olarak doğrulandı, Coverage Gap değil. Bu değerlendirme mevcut ISTER dokümanıyla uyumlu.",
+        "change": "DMA-DEC-005 classification alanına DECISION rationale eklendi: 'Hardware requirement DMA-REQ-L2-011 SATISFIED. SW polling is architectural choice, not gap.'",
+        "v2_principle": "Coverage Gap = no component. Decision = component present, usage choice documented."
+      },
+      {
+        "update_id": "UPD-004",
+        "section": "Section 5.4 (PROJECT-B Patterns)",
+        "type": "ADDITION",
+        "description": "2 yeni PATTERN node önerisi eklendi: PAT-B-006 (AXI Address Map Explicit Assignment) ve PAT-B-007 (Out-of-Context Synthesis). ISTER dokümanı Pattern bölümüne eklenmelidir.",
+        "change": "5.4.5 PATTERN Node'ları bölümüne PAT-B-006 ve PAT-B-007 eklendi.",
+        "v2_principle": "Pattern extraction from code/scripts is Phase 2 automation task"
+      },
+      {
+        "update_id": "UPD-005",
+        "section": "Signal Path ekseni analizi (her iki proje)",
+        "type": "ADDITION",
+        "description": "Her iki projedeki Signal Path ekseni kapsamı analiz edildi. PROJECT-A: timing raporu yok (implementation çalıştırılmamış). PROJECT-B: WNS > 0 ns synthesis ile doğrulandı.",
+        "change": "DMA-REQ-L1-006 ve AXI-REQ-L1-005 node'larına 'Signal Path Coverage Analysis' referansı eklendi. PROJECT-A timing verification gap'i ISSUE-A-007 ile ilişkilendirildi (testbench yok — timing doğrulaması da yok).",
+        "v2_principle": "Evidence binding — timing claims must be backed by actual tool reports"
+      },
+      {
+        "update_id": "UPD-006",
+        "section": "SOURCE_DOC paths",
+        "type": "CORRECTION",
+        "description": "SDOC-A-001..009 ve SDOC-B-001..011 dosya yolları mevcut sisteme göre normalize edildi. ISTER dokümanındaki Windows pathler (/home/testpc/...) Linux pathlerle (/home/test123/... ve Desktop/fpga_asist_dev-master/...) eşleştirildi.",
+        "change": "SOURCE_DOC node path_actual alanları eklendi.",
+        "v2_principle": "Provenance accuracy — paths must be resolvable"
+      }
+    ]
+  }
+}
