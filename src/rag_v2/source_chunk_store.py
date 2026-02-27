@@ -228,16 +228,9 @@ class SourceFileChunker:
         header_text = content[:first_func_pos].strip()
         if header_text:
             header_lines = header_text.count("\n") + 1
-            chunks.append(SourceChunk(
-                chunk_id=f"{file_prefix}_headers",
-                content=header_text[:MAX_CHUNK_CHARS],
-                file_path=file_path,
-                file_type="c",
-                project=project,
-                start_line=1,
-                end_line=header_lines,
-                chunk_label="includes_defines_typedefs",
-                related_node_ids=node_ids,
+            # typedef struct varsa ayrı chunk'lara böl
+            chunks.extend(self._split_c_headers(
+                header_text, file_path, file_prefix, project, node_ids, header_lines
             ))
 
         for start_pos, end_pos, func_name in func_matches:
@@ -272,10 +265,145 @@ class SourceFileChunker:
                     related_node_ids=node_ids,
                 ))
 
+        # Fonksiyonlar arası içerik (typedef struct, global vars, #ifdef blokları)
+        # func_matches sıralıdır; ardışık iki fonksiyon arasındaki boşluğu kontrol et
+        for i, (s, e, _) in enumerate(func_matches):
+            next_start = func_matches[i + 1][0] if i + 1 < len(func_matches) else len(content)
+            inter = content[e:next_start].strip()
+            if inter and len(inter) > 40:
+                sl = content[:e].count("\n") + 1
+                el = content[:next_start].count("\n") + 1
+                for j, sub in enumerate(
+                    self._split_text(inter) if len(inter) > MAX_CHUNK_CHARS else [inter]
+                ):
+                    chunks.append(SourceChunk(
+                        chunk_id=f"{file_prefix}_decl_{sl}" + (f"_{j}" if j else ""),
+                        content=sub,
+                        file_path=file_path,
+                        file_type="c",
+                        project=project,
+                        start_line=sl,
+                        end_line=el,
+                        chunk_label=f"declarations_after_line_{sl}",
+                        related_node_ids=node_ids,
+                    ))
+
         if not chunks:
             return self._chunk_default(content, file_path, "c", project, node_ids)
 
         return chunks
+
+    def _split_c_headers(
+        self,
+        header_text: str,
+        file_path: str,
+        file_prefix: str,
+        project: str,
+        node_ids: List[str],
+        end_line: int,
+    ) -> List[SourceChunk]:
+        """
+        C header bloğunu typedef struct sınırlarına göre böl.
+        Küçük header'lar (<= 800 chars) tek chunk olarak kalır.
+        """
+        typedef_re = re.compile(r'typedef\s+struct\s*\w*\s*\{', re.MULTILINE)
+        matches = list(typedef_re.finditer(header_text))
+
+        if not matches:
+            # Struct yok → tek chunk
+            return [SourceChunk(
+                chunk_id=f"{file_prefix}_headers",
+                content=header_text[:MAX_CHUNK_CHARS],
+                file_path=file_path,
+                file_type="c",
+                project=project,
+                start_line=1,
+                end_line=end_line,
+                chunk_label="includes_defines_typedefs",
+                related_node_ids=node_ids,
+            )]
+
+        chunks: List[SourceChunk] = []
+        last_pos = 0
+
+        for i, m in enumerate(matches):
+            # struct öncesi içerik (includes + defines)
+            pre = header_text[last_pos:m.start()].strip()
+            if pre and i == 0:
+                chunks.append(SourceChunk(
+                    chunk_id=f"{file_prefix}_headers_pre",
+                    content=pre[:MAX_CHUNK_CHARS],
+                    file_path=file_path,
+                    file_type="c",
+                    project=project,
+                    start_line=1,
+                    end_line=1 + pre.count("\n"),
+                    chunk_label="includes_defines",
+                    related_node_ids=node_ids,
+                ))
+
+            # struct bloğunun sonunu brace sayarak bul
+            brace_depth = 0
+            pos = m.start()
+            struct_end = len(header_text)
+            while pos < len(header_text):
+                if header_text[pos] == "{":
+                    brace_depth += 1
+                elif header_text[pos] == "}":
+                    brace_depth -= 1
+                    if brace_depth == 0:
+                        semi = header_text.find(";", pos)
+                        struct_end = semi + 1 if semi != -1 else pos + 1
+                        break
+                pos += 1
+
+            struct_text = header_text[m.start():struct_end]
+            # "typedef struct { ... } NAME;" → NAME al
+            name_m = re.search(r'\}\s*(\w+)\s*;', struct_text)
+            struct_name = name_m.group(1) if name_m else f"struct_{i}"
+
+            sl = 1 + header_text[:m.start()].count("\n")
+            el = 1 + header_text[:struct_end].count("\n")
+            chunks.append(SourceChunk(
+                chunk_id=f"{file_prefix}_struct_{struct_name}",
+                content=struct_text[:MAX_CHUNK_CHARS],
+                file_path=file_path,
+                file_type="c",
+                project=project,
+                start_line=sl,
+                end_line=el,
+                chunk_label=f"typedef struct {struct_name}",
+                related_node_ids=node_ids,
+            ))
+            last_pos = struct_end
+
+        # Son struct'tan sonra kalan içerik
+        remaining = header_text[last_pos:].strip()
+        if remaining:
+            sl = 1 + header_text[:last_pos].count("\n")
+            chunks.append(SourceChunk(
+                chunk_id=f"{file_prefix}_headers_post",
+                content=remaining[:MAX_CHUNK_CHARS],
+                file_path=file_path,
+                file_type="c",
+                project=project,
+                start_line=sl,
+                end_line=end_line,
+                chunk_label="global_vars",
+                related_node_ids=node_ids,
+            ))
+
+        return chunks if chunks else [SourceChunk(
+            chunk_id=f"{file_prefix}_headers",
+            content=header_text[:MAX_CHUNK_CHARS],
+            file_path=file_path,
+            file_type="c",
+            project=project,
+            start_line=1,
+            end_line=end_line,
+            chunk_label="includes_defines_typedefs",
+            related_node_ids=node_ids,
+        )]
 
     # ------------------------------------------------------------------
     # Header dosyaları — #define + typedef + struct
@@ -298,8 +426,10 @@ class SourceFileChunker:
 
         # Büyük XDC: ## başlıklı bölümlere göre böl
         # NOTE: Some XDC files use "## Section" (with space) and some "##Section" (no space)
+        # Ayrıca "#PWM Audio Amplifier" gibi tek-hash subsection başlıkları da bölünüyor:
+        # ^#(?=[A-Z]) — tek # + büyük harf (commented set_property'ler küçük harf ile başlar)
         chunks = []
-        sections = re.split(r'(?m)^##\s*', content)
+        sections = re.split(r'(?m)^##\s*|^#(?=[A-Z])', content)
         for i, sec in enumerate(sections):
             if not sec.strip():
                 continue
@@ -322,7 +452,7 @@ class SourceFileChunker:
             content, file_path, "xdc", project, node_ids)
 
     # ------------------------------------------------------------------
-    # TCL — ADIM bölümleri veya "puts / set_property" blokları
+    # TCL — proc sınırları, # Create instance: blokları, veya ADIM/Step
     # ------------------------------------------------------------------
 
     def _chunk_tcl(self, content: str, file_path: str, project: str,
@@ -330,8 +460,101 @@ class SourceFileChunker:
         if len(content) <= MAX_CHUNK_CHARS:
             return self._whole_file_chunk(content, file_path, "tcl", project, node_ids)
 
+        stem = Path(file_path).stem
+
+        # ── Strategy 1: proc-level split (design_1.tcl / BD-TCL style) ──────
+        # Each top-level "proc <name> {" becomes its own chunk.
+        # Then within large procs, split further on "# Create instance:" lines.
+        proc_re = re.compile(r'(?m)^proc\s+(\w+)', re.MULTILINE)
+        proc_matches = list(proc_re.finditer(content))
+
+        if proc_matches:
+            chunks = []
+            # Content before first proc (boilerplate / preamble)
+            preamble = content[:proc_matches[0].start()].strip()
+            if len(preamble) > 50:
+                start_ln = 1
+                end_ln = content[:proc_matches[0].start()].count("\n") + 1
+                for j, sub in enumerate(self._split_text(preamble) if len(preamble) > MAX_CHUNK_CHARS else [preamble]):
+                    chunks.append(SourceChunk(
+                        chunk_id=f"{stem}_preamble_{j}" if j else f"{stem}_preamble",
+                        content=sub,
+                        file_path=file_path,
+                        file_type="tcl",
+                        project=project,
+                        start_line=start_ln,
+                        end_line=end_ln,
+                        chunk_label="preamble",
+                        related_node_ids=node_ids,
+                    ))
+
+            for pi, pm in enumerate(proc_matches):
+                proc_name = pm.group(1)
+                proc_start = pm.start()
+                proc_end = proc_matches[pi + 1].start() if pi + 1 < len(proc_matches) else len(content)
+                proc_body = content[proc_start:proc_end].strip()
+                sl = content[:proc_start].count("\n") + 1
+                el = content[:proc_end].count("\n") + 1
+
+                # Try to split large procs on "# Create instance:" lines
+                inst_re = re.compile(r'(?m)^\s*#\s*Create instance\s*:\s*(\w+)', re.IGNORECASE)
+                inst_matches = list(inst_re.finditer(proc_body))
+
+                if len(proc_body) > MAX_CHUNK_CHARS and inst_matches:
+                    # Preamble of the proc (before first Create instance)
+                    pre = proc_body[:inst_matches[0].start()].strip()
+                    if len(pre) > 50:
+                        chunks.append(SourceChunk(
+                            chunk_id=f"{stem}_proc_{proc_name}_header",
+                            content=pre[:MAX_CHUNK_CHARS],
+                            file_path=file_path,
+                            file_type="tcl",
+                            project=project,
+                            start_line=sl,
+                            end_line=sl + pre.count("\n"),
+                            chunk_label=f"{proc_name} (header)",
+                            related_node_ids=node_ids,
+                        ))
+                    # Each IP instance block
+                    for ii, im in enumerate(inst_matches):
+                        ip_name = im.group(1)
+                        blk_start = im.start()
+                        blk_end = inst_matches[ii + 1].start() if ii + 1 < len(inst_matches) else len(proc_body)
+                        blk = proc_body[blk_start:blk_end].strip()
+                        blk_sl = sl + proc_body[:blk_start].count("\n")
+                        blk_el = sl + proc_body[:blk_end].count("\n")
+                        for j, sub in enumerate(self._split_text(blk) if len(blk) > MAX_CHUNK_CHARS else [blk]):
+                            chunks.append(SourceChunk(
+                                chunk_id=f"{stem}_{ip_name}_{j}" if j else f"{stem}_{ip_name}",
+                                content=sub,
+                                file_path=file_path,
+                                file_type="tcl",
+                                project=project,
+                                start_line=blk_sl,
+                                end_line=blk_el,
+                                chunk_label=ip_name,
+                                related_node_ids=node_ids,
+                            ))
+                else:
+                    # Proc small enough or no Create instance → whole proc or split
+                    for j, sub in enumerate(self._split_text(proc_body) if len(proc_body) > MAX_CHUNK_CHARS else [proc_body]):
+                        chunks.append(SourceChunk(
+                            chunk_id=f"{stem}_proc_{proc_name}_{j}" if j else f"{stem}_proc_{proc_name}",
+                            content=sub,
+                            file_path=file_path,
+                            file_type="tcl",
+                            project=project,
+                            start_line=sl,
+                            end_line=el,
+                            chunk_label=f"{proc_name} (part {j+1})" if j else proc_name,
+                            related_node_ids=node_ids,
+                        ))
+
+            if chunks:
+                return chunks
+
+        # ── Strategy 2: ADIM / Step / #### separators ────────────────────────
         chunks = []
-        # "# ADIM N:" veya "# Step N:" veya "####" separator'a göre böl
         section_re = re.compile(
             r'(?m)^(?:#+\s*(?:ADIM|Step|PHASE|Phase)\s*\d+|#{4,})', re.IGNORECASE)
         positions = [m.start() for m in section_re.finditer(content)]
@@ -349,7 +572,7 @@ class SourceFileChunker:
             if len(sec) > MAX_CHUNK_CHARS:
                 for j, sub in enumerate(self._split_text(sec)):
                     chunks.append(SourceChunk(
-                        chunk_id=f"{Path(file_path).stem}_s{i}_{j}",
+                        chunk_id=f"{stem}_s{i}_{j}",
                         content=sub,
                         file_path=file_path,
                         file_type="tcl",
@@ -361,7 +584,7 @@ class SourceFileChunker:
                     ))
             else:
                 chunks.append(SourceChunk(
-                    chunk_id=f"{Path(file_path).stem}_s{i}",
+                    chunk_id=f"{stem}_s{i}",
                     content=sec,
                     file_path=file_path,
                     file_type="tcl",
@@ -682,6 +905,152 @@ class SourceChunkStore:
                 "related_node_ids": node_ids,
             })
 
+        return results
+
+    def search_within_file(
+        self,
+        query: str,
+        file_stem: str,
+        n_results: int = 8,
+    ) -> List[Dict[str, Any]]:
+        """
+        Belirli bir dosyanın chunk'ları içinde semantik arama yap.
+        C dosyaları için header/define chunk'larını her zaman dahil et.
+        Bu sayede büyük dosyalarda (design_1.tcl gibi) sadece en ilgili
+        chunk'lar context'e girer — context bloat önlenir.
+        """
+        col = self._get_collection()
+        if col.count() == 0:
+            return []
+        try:
+            all_data = col.get(include=["documents", "metadatas"])
+        except Exception as e:
+            print(f"  [SourceChunkStore] search_within_file get hata: {e}")
+            return []
+
+        # Bu dosyaya ait chunk ID'lerini ve metadata'larını topla
+        stem_lower = file_stem.lower()
+        file_ids: List[str] = []
+        file_docs: Dict[str, str] = {}
+        file_metas: Dict[str, Dict] = {}
+        for cid, doc, meta in zip(
+            all_data.get("ids", []),
+            all_data.get("documents", []),
+            all_data.get("metadatas", []),
+        ):
+            if stem_lower in Path(meta.get("file_path", "")).stem.lower():
+                file_ids.append(cid)
+                file_docs[cid] = doc
+                file_metas[cid] = meta
+
+        if not file_ids:
+            return []
+
+        # C dosyaları için header/define chunk'larını her zaman öne al
+        # (#define sabitleri ve struct tanımları semantic aramada sıralamada geride kalabilir)
+        _HEADER_LABELS = {"includes_defines", "global_vars"}
+        pinned_ids: List[str] = []
+        search_ids = list(file_ids)
+
+        # İlk dosyanın türünü belirle
+        sample_meta = file_metas[file_ids[0]]
+        if sample_meta.get("file_type", "") in ("c", "cpp", "h", "hpp"):
+            for cid in file_ids:
+                label = file_metas[cid].get("chunk_label", "")
+                if label in _HEADER_LABELS or label.startswith("typedef_struct_"):
+                    pinned_ids.append(cid)
+            # Pinned chunk'ları arama havuzundan çıkar
+            search_ids = [cid for cid in file_ids if cid not in set(pinned_ids)]
+
+        # Semantik arama için kalan slot sayısı
+        semantic_n = max(1, n_results - len(pinned_ids))
+
+        def _make_result(cid: str, sim: float) -> Dict[str, Any]:
+            meta = file_metas[cid]
+            node_ids_raw = meta.get("related_node_ids", "[]")
+            try:
+                node_ids = json.loads(node_ids_raw) if node_ids_raw else []
+            except Exception:
+                node_ids = []
+            return {
+                "chunk_id": cid,
+                "content": file_docs[cid],
+                "file_path": meta.get("file_path", ""),
+                "file_type": meta.get("file_type", ""),
+                "project": meta.get("project", ""),
+                "start_line": meta.get("start_line", 0),
+                "end_line": meta.get("end_line", 0),
+                "chunk_label": meta.get("chunk_label", ""),
+                "similarity": round(max(sim, 0.95), 4),
+                "related_node_ids": node_ids,
+            }
+
+        # Pinned chunk'ları ekle
+        results: List[Dict[str, Any]] = [_make_result(cid, 0.97) for cid in pinned_ids]
+        seen_ids: set = set(pinned_ids)
+
+        # Kalan chunk'lar içinde semantik arama
+        if search_ids and semantic_n > 0:
+            try:
+                embedding = self.embed_texts([query])[0]
+                raw = col.query(
+                    query_embeddings=[embedding],
+                    n_results=min(semantic_n, len(search_ids)),
+                    include=["documents", "metadatas", "distances"],
+                    where={"chunk_id": {"$in": search_ids}},
+                )
+                for doc, meta, dist in zip(
+                    raw.get("documents", [[]])[0],
+                    raw.get("metadatas", [[]])[0],
+                    raw.get("distances", [[]])[0],
+                ):
+                    cid = meta.get("chunk_id", "")
+                    if cid not in seen_ids:
+                        seen_ids.add(cid)
+                        sim = max(0.0, 1.0 - dist)
+                        results.append(_make_result(cid, sim))
+            except Exception as e:
+                print(f"  [SourceChunkStore] search_within_file query hata: {e}")
+
+        return results
+
+    def search_by_filename(self, file_stem: str) -> List[Dict[str, Any]]:
+        """
+        Belirli bir dosyaya ait tüm chunk'ları döndür (file_path substring match).
+        Küçük dosyalar (<= 8 chunk) için tümünü döndür.
+        Büyük dosyalar için search_within_file() kullan.
+        """
+        col = self._get_collection()
+        if col.count() == 0:
+            return []
+        try:
+            all_data = col.get(include=["documents", "metadatas"])
+        except Exception as e:
+            print(f"  [SourceChunkStore] search_by_filename hata: {e}")
+            return []
+
+        results = []
+        stem_lower = file_stem.lower()
+        for doc, meta in zip(all_data.get("documents", []), all_data.get("metadatas", [])):
+            fp = meta.get("file_path", "")
+            if stem_lower in Path(fp).stem.lower():
+                node_ids_raw = meta.get("related_node_ids", "[]")
+                try:
+                    node_ids = json.loads(node_ids_raw) if node_ids_raw else []
+                except Exception:
+                    node_ids = []
+                results.append({
+                    "chunk_id": meta.get("chunk_id", ""),
+                    "content": doc,
+                    "file_path": fp,
+                    "file_type": meta.get("file_type", ""),
+                    "project": meta.get("project", ""),
+                    "start_line": meta.get("start_line", 0),
+                    "end_line": meta.get("end_line", 0),
+                    "chunk_label": meta.get("chunk_label", ""),
+                    "similarity": 1.0,   # dosya adı eşleşmesi → en yüksek öncelik
+                    "related_node_ids": node_ids,
+                })
         return results
 
     def reset(self):

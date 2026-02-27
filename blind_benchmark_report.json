@@ -1,0 +1,613 @@
+{
+  "timestamp": "2026-02-26T12:57:43.203011",
+  "total_score": 0.891,
+  "overall_grade": "A",
+  "elapsed_s": 932.0,
+  "n_questions": 20,
+  "categories": [
+    {
+      "category": "rtl",
+      "label": "RTL / Verilog (PROJECT-A)",
+      "score": 0.975,
+      "grade": "A",
+      "n_questions": 6,
+      "questions": [
+        {
+          "id": "BL-RTL-01",
+          "category": "rtl",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "fifo_wr_data",
+            "axis_tdata",
+            "15:0",
+            "16"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "15:0"
+          ],
+          "val_misses": [],
+          "source_chunks": 11,
+          "chunk_files": [
+            "helloworld.c",
+            "platform.c",
+            "axis2fifo.v",
+            "design_1.tcl",
+            "fifo2audpwm.v"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## axis2fifo Modülünde `fifo_wr_data` Veri Kaynağı\n\n### Doğrudan Kaynak Kodu Kanıtı\n\n`axis2fifo.v` dosyasının **35. satırına** göre:\n\n```verilog\nassign fifo_wr_data = axis_tdata[15:0];\n```\n\n### Cevap\n\n`fifo_wr_data` portuna aktarılan veri, `axis_tdata` sinyalinin **`[15:0]` bit aralığından** (alt 16",
+          "ground_truth": "axis2fifo.v satır 35: assign fifo_wr_data = axis_tdata[15:0]"
+        },
+        {
+          "id": "BL-RTL-02",
+          "category": "rtl",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "axis_tready",
+            "fifo_full",
+            "~",
+            "dolu değil",
+            "not"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "fifo_full"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "platform.c",
+            "Nexys-A7-100T-Master.xdc",
+            "axis2fifo.v",
+            "design_1.tcl",
+            "fifo2audpwm.v",
+            "platform.h"
+          ],
+          "query_type": "How",
+          "answer_snippet": "# `axis2fifo` Modülünde `axis_tready` Sinyalinin Üretimi\n\n## Kaynak: `axis2fifo.v`, Satır 33\n\n```verilog\nassign axis_tready = ~fifo_full;\n```\n\n---\n\n## Açıklama\n\n`axis_tready` sinyali, doğrudan **`fifo_full`** sinyalinin mantıksal tersi (NOT) olarak üretilmektedir. Bu tek satırlık kombinasyonel bir `",
+          "ground_truth": "axis2fifo.v satır 33: assign axis_tready = ~fifo_full"
+        },
+        {
+          "id": "BL-RTL-03",
+          "category": "rtl",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "duty",
+            "4",
+            "7:0",
+            "15:8",
+            "23:16",
+            "31:24"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "4"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "axis2fifo.v",
+            "design_1.tcl",
+            "helloworld.c",
+            "fifo2audpwm.v"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## fifo2audpwm — 32-bit FIFO Verisinin Duty Cycle Register'larına Dağıtımı\n\n**Kaynak:** `fifo2audpwm.v`, satır 29-32\n\n---\n\n### Register Sayısı ve Boyutu\n\nModül, 32-bit FIFO verisini **4 ayrı duty cycle register'ına** dağıtır:\n\n```verilog\nreg [DATA_WIDTH:0] duty [3:0];   // 4 elemanlı dizi, her biri ",
+          "ground_truth": "fifo2audpwm.v satır 22, 29-32: reg [DATA_WIDTH:0] duty [3:0]"
+        },
+        {
+          "id": "BL-RTL-04",
+          "category": "rtl",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.85,
+          "term_hits": [
+            "10",
+            "count",
+            "DATA_WIDTH"
+          ],
+          "term_misses": [
+            "9:0"
+          ],
+          "val_hits": [
+            "10"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "helloworld.c",
+            "platform.c",
+            "design_1.tcl",
+            "fifo2audpwm.v",
+            "platform.h"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## `fifo2audpwm` Modülünde `count` Register'ı Bit Genişliği\n\n### Kaynak: `fifo2audpwm.v`, satır 22\n\n```verilog\nreg [DATA_WIDTH+1:0] count = 0;\n```\n\n---\n\n### Bit Genişliği Hesabı\n\n`count` register'ı **`[DATA_WIDTH+1:0]`** olarak tanımlanmıştır.\n\n| Parametre | Değer |\n|-----------|-------|\n| `DATA_WID",
+          "ground_truth": "fifo2audpwm.v satır 21: reg [DATA_WIDTH+1:0] count = 0 → DATA_WIDTH=8 → [9:0] = 10 bit"
+        },
+        {
+          "id": "BL-RTL-05",
+          "category": "rtl",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "0x00B22D0E",
+            "00B22D0E",
+            "261",
+            "96000",
+            "INCREMENT"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "00B22D0E",
+            "261",
+            "96000"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "design_1.tcl",
+            "helloworld.c",
+            "fifo2audpwm.v",
+            "tone_generator.v"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## tone_generator.v — INCREMENT Değeri Analizi\n\n### Hexadecimal INCREMENT Değeri\n\nKaynak dosyadan (**tone_generator.v, satır 50**) doğrudan alınan değer:\n\n```verilog\nlocalparam INCREMENT = 32'h00B22D0E;\n```\n\n---\n\n### Karşılık Geldiği Frekanslar\n\n| Parametre | Değer | Kaynak |\n|---|---|---|\n| **INCRE",
+          "ground_truth": "tone_generator.v satır 50: localparam INCREMENT = 32'h00B22D0E, param 261 Hz / 96 kHz"
+        },
+        {
+          "id": "BL-RTL-06",
+          "category": "rtl",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "duty",
+            "31:16",
+            "üst 16",
+            "axis_tdata",
+            "accumulator"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "31:16"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "design_1.tcl",
+            "helloworld.c",
+            "tone_generator.v"
+          ],
+          "query_type": "How",
+          "answer_snippet": "## `tone_generator` Modülünde `axis_tdata` Üretimi\n\n### İlgili Verilog Satırı\n\nKaynak dosya `tone_generator.v`, satır 57:\n\n```verilog\nassign axis_tdata = {{(AXIS_DATA_WIDTH-16){1'b0}}, duty[ACCUMULATOR_DEPTH-1:ACCUMULATOR_DEPTH-16]};\n```\n\n---\n\n### Parametre Değerleri\n\n| Parametre | Değer | Kaynak |\n",
+          "ground_truth": "tone_generator.v satır 59: assign axis_tdata = {{16{1'b0}}, duty[31:16]}"
+        }
+      ]
+    },
+    {
+      "category": "firmware",
+      "label": "C Firmware  (PROJECT-A)",
+      "score": 0.723,
+      "grade": "B",
+      "n_questions": 4,
+      "questions": [
+        {
+          "id": "BL-FW-01",
+          "category": "firmware",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "0x1000000",
+            "MEM_BASE_ADDR",
+            "DDR_BASE_ADDR",
+            "16"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "0x1000000"
+          ],
+          "val_misses": [],
+          "source_chunks": 47,
+          "chunk_files": [
+            "helloworld.c",
+            "design_1.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## `MEM_BASE_ADDR` Sabiti Analizi\n\n### Kaynak: `helloworld.c` satır 15-16\n\n```c\n#define DDR_BASE_ADDR    XPAR_MIG7SERIES_0_BASEADDR\n#define MEM_BASE_ADDR    (DDR_BASE_ADDR + 0x1000000)\n```\n\n---\n\n### Tanımların Açıklaması\n\n| Sabit | Değer | Açıklama |\n|---|---|---|\n| `DDR_BASE_ADDR` | `XPAR_MIG7SERIE",
+          "ground_truth": "helloworld.c satır 16: #define MEM_BASE_ADDR (DDR_BASE_ADDR + 0x1000000)"
+        },
+        {
+          "id": "BL-FW-02",
+          "category": "firmware",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.44,
+          "term_hits": [
+            "24",
+            "dma_sw_tone_gen"
+          ],
+          "term_misses": [
+            "0x00B22D0E",
+            "accum",
+            ">>24"
+          ],
+          "val_hits": [
+            "24"
+          ],
+          "val_misses": [
+            "0x00B22D0E"
+          ],
+          "source_chunks": 40,
+          "chunk_files": [
+            "helloworld.c"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## Yanıt: `dma_sw_tone_gen()` Fonksiyonu Hakkında\n\n### Context'te Bulunamadı\n\nSağlanan kaynak dosya içeriklerinde `dma_sw_tone_gen()` fonksiyonu **mevcut değildir**.\n\nContext'te yalnızca aşağıdaki `helloworld.c` bölümleri yer almaktadır:\n\n| Satır Aralığı | İçerik |\n|---|---|\n| 1–24 | `#include` dire",
+          "ground_truth": "helloworld.c satır 292-293: accum += 0x00B22D0E; ((u8*)buffer)[i] = accum>>24"
+        },
+        {
+          "id": "BL-FW-03",
+          "category": "firmware",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "MaxTransferLen",
+            "TxBdRing",
+            "xil_printf",
+            "init_dma"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "MaxTransferLen"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "helloworld.c"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## `init_dma()` Fonksiyonunun Konsol Çıktısı\n\n### İlgili `xil_printf` Satırı\n\nKaynak dosyadan (`helloworld.c`, satır 56-103, `init_dma` fonksiyonu):\n\n```c\nxil_printf(\"Note: MaxTransferLen=%d\\r\\n\", p_dma_inst->TxBdRing.MaxTransferLen);\n```\n\n---\n\n### Yazdırılan Değer ve Struct Alanı\n\n| Bileşen | Detay",
+          "ground_truth": "helloworld.c satır 100: xil_printf('Note: MaxTransferLen=%d', TxBdRing.MaxTransferLen)"
+        },
+        {
+          "id": "BL-FW-04",
+          "category": "firmware",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.45,
+          "term_hits": [
+            "switch_pe",
+            "switch_ne",
+            "GpioIn_Data"
+          ],
+          "term_misses": [
+            "u16"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "u16"
+          ],
+          "source_chunks": 46,
+          "chunk_files": [
+            "helloworld.c",
+            "design_1.tcl",
+            "Nexys-A7-100T-Master.xdc"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## GpioIn_Data Struct Analizi\n\n### Context'teki Durum\n\nVerilen kaynak dosya içeriklerinde `GpioIn_Data` struct'ının **tanım bloğu (typedef struct GpioIn_Data { ... })** yer almamaktadır. Context yalnızca aşağıdaki bölümleri kapsamaktadır:\n\n- `helloworld.c:1-24` — includes ve defines\n- `helloworld.c:",
+          "ground_truth": "helloworld.c satır 53-54: u16 switch_pe; u16 switch_ne;"
+        }
+      ]
+    },
+    {
+      "category": "tcl",
+      "label": "TCL / Block Design (B)",
+      "score": 1.0,
+      "grade": "A",
+      "n_questions": 4,
+      "questions": [
+        {
+          "id": "BL-TCL-01",
+          "category": "tcl",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "C_D_AXI",
+            "0",
+            "devre dışı",
+            "LMB"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "0"
+          ],
+          "val_misses": [],
+          "source_chunks": 17,
+          "chunk_files": [
+            "create_axi_simple.tcl",
+            "add_axi_gpio.tcl",
+            "SYNTHESIS_RESULTS.md",
+            "create_axi_with_xdc.tcl",
+            "create_minimal_microblaze.tcl"
+          ],
+          "query_type": "How",
+          "answer_snippet": "## `create_minimal_microblaze.tcl` — `CONFIG.C_D_AXI` Parametresi\n\n### Parametre Değeri\n\n**Kaynak:** `validation_test/axi_example/create_minimal_microblaze.tcl`, satır 26-65 (ADIM 2)\n\n```tcl\nset_property -dict [list \\\n    CONFIG.C_DEBUG_ENABLED {1} \\\n    CONFIG.C_D_AXI {0} \\        ← Bu değer\n    CO",
+          "ground_truth": "create_minimal_microblaze.tcl satır 36: CONFIG.C_D_AXI {0}"
+        },
+        {
+          "id": "BL-TCL-02",
+          "category": "tcl",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "8KB",
+            "8",
+            "local_mem",
+            "LMB",
+            "BRAM"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "8"
+          ],
+          "val_misses": [],
+          "source_chunks": 13,
+          "chunk_files": [
+            "add_axi_gpio.tcl",
+            "design_1.tcl",
+            "SYNTHESIS_RESULTS.md",
+            "create_axi_with_xdc.tcl",
+            "create_minimal_microblaze.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## `apply_bd_automation` — `local_mem` Parametresi Analizi\n\n### Doğrudan Kaynak Kodu Cevabı\n\n**Kaynak:** `validation_test/axi_example/create_minimal_microblaze.tcl`, satır 65-75 (section: *ADIM 3*)\n\n```tcl\napply_bd_automation -rule xilinx.com:bd_rule:microblaze \\\n    -config {local_mem \"8KB\" ecc \"No",
+          "ground_truth": "create_minimal_microblaze.tcl satır 70: local_mem \"8KB\""
+        },
+        {
+          "id": "BL-TCL-03",
+          "category": "tcl",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "100",
+            "PRIM_IN_FREQ",
+            "CLKOUT1_REQUESTED",
+            "clk_wiz"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "100"
+          ],
+          "val_misses": [],
+          "source_chunks": 19,
+          "chunk_files": [
+            "design_1.tcl",
+            "create_minimal_microblaze.tcl",
+            "Nexys-A7-100T-Master.xdc"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## create_minimal_microblaze.tcl — clk_wiz_0 Saat Tasarımı\n\n### Kaynak Değerler (Doğrudan TCL Dosyasından)\n\nKaynak dosya `validation_test/axi_example/create_minimal_microblaze.tcl`, satır 26-65 (section: **ADIM 2**) içinde `clk_wiz_0` IP'si şu şekilde yapılandırılmıştır:\n\n```tcl\ncreate_bd_cell -type",
+          "ground_truth": "create_minimal_microblaze.tcl satır 53-54: PRIM_IN_FREQ {100} CLKOUT1_REQUESTED_OUT_FREQ {100}"
+        },
+        {
+          "id": "BL-TCL-04",
+          "category": "tcl",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "G4",
+            "LVCMOS15",
+            "resetn",
+            "reset"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "G4",
+            "LVCMOS15"
+          ],
+          "val_misses": [],
+          "source_chunks": 19,
+          "chunk_files": [
+            "design_1.tcl",
+            "create_minimal_microblaze.tcl",
+            "project_info.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## `reset_n` Sinyalinin Pin Ataması\n\n`create_minimal_microblaze.tcl` dosyasının **ADIM 7** bölümünde (satır 115-162), XDC kısıtlamaları içinde `reset_n` sinyali şu şekilde tanımlanmıştır:\n\n```xdc\nset_property -dict {PACKAGE_PIN G4 IOSTANDARD LVCMOS15} [get_ports reset_n]\n```\n\n| Parametre | Değer |\n|",
+          "ground_truth": "create_minimal_microblaze.tcl satır 123: PACKAGE_PIN G4 IOSTANDARD LVCMOS15"
+        }
+      ]
+    },
+    {
+      "category": "xdc",
+      "label": "XDC / Constraints (B)",
+      "score": 1.0,
+      "grade": "A",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "BL-XDC-01",
+          "category": "xdc",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "T14",
+            "LVCMOS25",
+            "leds"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "T14",
+            "LVCMOS25"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "create_axi_with_xdc.tcl",
+            "create_axi_auto.tcl",
+            "create_axi_simple.tcl",
+            "add_axi_gpio.tcl",
+            "create_axi_simple_gpio.tcl",
+            "SYNTHESIS_RESULTS.md",
+            "nexys_video.xdc"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## `leds[0]` Port Ataması\n\n`axi_example` projesinin `nexys_video.xdc` kısıt dosyasına göre:\n\n| Port | PACKAGE_PIN | IOSTANDARD |\n|------|-------------|------------|\n| `leds[0]` | **T14** | **LVCMOS25** |\n\n### Kaynak\n\nBu bilgi doğrudan aşağıdaki satırdan alınmıştır:\n\n```xdc\nset_property -dict { PACKA",
+          "ground_truth": "nexys_video.xdc satır 11: PACKAGE_PIN T14 IOSTANDARD LVCMOS25 leds[0]"
+        },
+        {
+          "id": "BL-XDC-02",
+          "category": "xdc",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "LVCMOS12",
+            "LVCMOS25",
+            "E22",
+            "switches",
+            "leds"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "LVCMOS12",
+            "E22"
+          ],
+          "val_misses": [],
+          "source_chunks": 11,
+          "chunk_files": [
+            "nexys_video.xdc",
+            "helloworld.c",
+            "Nexys-A7-100T-Master.xdc"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## nexys_video.xdc — IOSTANDARD Analizi\n\n### Switches Portları için IOSTANDARD\n\nKaynak dosyaya göre (`nexys_video.xdc`, satır 22-29), **switches** portları için kullanılan IOSTANDARD:\n\n```\nLVCMOS12\n```\n\nTüm switch pinleri aynı standartı kullanmaktadır:\n\n| Port | PACKAGE_PIN | IOSTANDARD |\n|------|--",
+          "ground_truth": "nexys_video.xdc satır 21: PACKAGE_PIN E22 IOSTANDARD LVCMOS12 switches[0]"
+        },
+        {
+          "id": "BL-XDC-03",
+          "category": "xdc",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "10.000",
+            "10",
+            "sys_clk",
+            "waveform",
+            "5.000",
+            "100"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "10.000"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "create_axi_with_xdc.tcl",
+            "create_axi_auto.tcl",
+            "create_axi_simple.tcl",
+            "create_axi_simple_gpio.tcl",
+            "SYNTHESIS_RESULTS.md",
+            "nexys_video.xdc",
+            "create_minimal_microblaze.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## Nexys Video XDC — `create_clock` Kısıtı Analizi\n\n### Periyot Değeri\n\n`nexys_video.xdc` dosyasında (satır 5) sistem saati için `create_clock` kısıtı şu şekilde tanımlanmıştır:\n\n```tcl\ncreate_clock -period 10.000 -name sys_clk -waveform {0.000 5.000} [get_ports clk]\n```\n\n**Periyot: `10.000 ns`**\n\nB",
+          "ground_truth": "nexys_video.xdc satır 5: create_clock -period 10.000 -name sys_clk -waveform {0.000 5.000}"
+        }
+      ]
+    },
+    {
+      "category": "trap",
+      "label": "Trap (DB'de yok)",
+      "score": 0.667,
+      "grade": "B",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "BL-TRAP-01",
+          "category": "trap",
+          "project": "PROJECT-A",
+          "type": "trap",
+          "score": 0.5,
+          "verdict": "PARTIAL (reddetti ama uydurma değer var)",
+          "hallucination_matches": [
+            "freertos"
+          ],
+          "source_chunks": 40,
+          "chunk_files": [
+            "helloworld.c"
+          ],
+          "query_type": "How",
+          "answer_snippet": "## DMA Audio Projesi — RTOS Kullanımı Hakkında\n\n### Kısa Yanıt: Hayır, RTOS Kullanılmamaktadır\n\nContext'teki kaynak dosyalar ve bileşen tanımlarına göre `helloworld.c` uygulaması **bare-metal (RTOS'suz)** olarak çalışmaktadır.\n\n---\n\n### Kanıtlar\n\n**1. Include dosyaları RTOS kütüphanesi içermiyor**\n\n",
+          "ground_truth": "helloworld.c bare-metal uygulama — FreeRTOS/RTOS kullanmıyor"
+        },
+        {
+          "id": "BL-TRAP-02",
+          "category": "trap",
+          "project": "PROJECT-A",
+          "type": "trap",
+          "score": 0.5,
+          "verdict": "PARTIAL (reddetti ama uydurma değer var)",
+          "hallucination_matches": [
+            "fifo2audpwm_tb",
+            "testbench",
+            "testbench",
+            "testbench",
+            "testbench",
+            "testbench",
+            "testbench"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "helloworld.c",
+            "fifo2audpwm.v",
+            "Nexys-A7-100T-Master.xdc"
+          ],
+          "query_type": "What",
+          "answer_snippet": "# fifo2audpwm Testbench Analizi\n\n## Testbench Varlığı\n\nContext'teki **EVID-A-sim-001** node'u, `fifo2audpwm` modülü için bir Verilog testbench tasarımının **mevcut olduğunu** doğrulamaktadır. Ancak dikkat edilmesi gereken önemli bir husus vardır:\n\n> ⚠️ **Önemli Not:** Context'te testbench'in **tasar",
+          "ground_truth": "Projede fifo2audpwm için testbench dosyası bulunmuyor"
+        },
+        {
+          "id": "BL-TRAP-03",
+          "category": "trap",
+          "project": "PROJECT-B",
+          "type": "trap",
+          "score": 1.0,
+          "verdict": "PASS",
+          "hallucination_matches": [],
+          "source_chunks": 20,
+          "chunk_files": [
+            "axi_gpio_wrapper.v",
+            "create_axi_auto.tcl",
+            "create_axi_simple.tcl",
+            "add_axi_gpio.tcl",
+            "create_axi_simple_gpio.tcl",
+            "SYNTHESIS_RESULTS.md"
+          ],
+          "query_type": "How",
+          "answer_snippet": "## AXI GPIO Interrupt Desteği — `add_axi_gpio.tcl` Analizi\n\n### Doğrudan Yanıt: **HAYIR, Interrupt Etkinleştirilmemiştir**\n\n`add_axi_gpio.tcl` dosyasının tüm adımları incelendiğinde, `axi_gpio_0` için interrupt desteğine dair **hiçbir yapılandırma bulunmamaktadır**.\n\n---\n\n### Kanıt: TCL Dosyasındaki",
+          "ground_truth": "axi_gpio_0 interrupt configure edilmemiş — AXI INTC yok bu projede"
+        }
+      ]
+    }
+  ]
+}

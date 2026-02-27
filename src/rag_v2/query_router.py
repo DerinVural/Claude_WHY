@@ -111,12 +111,22 @@ class QueryResult:
 # Pattern: (regex, QueryType) — first match wins
 _CLASSIFY_PATTERNS = [
     # Trace — traceability / izleme
-    (r'\b(trace|izle|zincir|traceability|hangi bileşen|implement|gerçek|karşıl)\b', QueryType.TRACE),
+    # Turkish morphology: izle→izleyin, zincir→zincirini, karşıl→karşıladığını
+    # Use \w+ suffix to handle Turkish agglutinative suffixes
+    (r'(?:\btrace(?:ability)?\b|\bizle\w+|\bzincir\w+|\bimplement\w+|\bhangi\s+bileşen\w*|\bgerçek\b|\bkarşıl(?:ay|ad|am)\w*)', QueryType.TRACE),
     # Why — rationale / decision
     (r'\b(neden|why|karar|rationale|gerekçe|motivated|sebep|nedeni|nasıl karar)\b', QueryType.WHY),
-    # CrossRef — comparison / contradiction
+    # CrossRef — comparison / contradiction / both-projects queries
     # Not: \b yerine prefix match — Türkçe ekler için (fark→farkı, benzer→benzerlik)
-    (r'(karşılaştır|fark\w*|versus|\bvs\b|analogous|contradicts|çelişki|benzer\w*|farklı\w*|alternatif\w*|arasındaki|iki proje|karşılaştırma)', QueryType.CROSSREF),
+    # "arasındaki" tek başına CROSSREF tetiklememeli — yalnızca karşılaştırma bağlamında
+    # "DDR_BASE_ADDR ile arasındaki offset" gibi ifadeler CROSSREF değil HOW/WHAT
+    # "her iki proje" / "project a ve b" / "iki proje için" → CROSSREF (no project filter)
+    (r'(karşılaştır|versus|\bvs\b|analogous|contradicts|çelişki|iki proje|karşılaştırma'
+     r'|her iki proje|her iki\s+(?:proje|sistem|tasarım)'
+     r'|project.a.ve.project.b|proje.a.ve.b|a\s+ve\s+b\s+(?:projesi|için|proje)'
+     r'|(?:iki\s+\w+\s+arasındaki)'
+     r'|\barasındaki\s+(?:fark|benzerlik|farklılık|ilişki|uyum|çelişki|karşılaştırma)'
+     r'|(?:fark\w*|benzer\w*|farklı\w*|alternatif\w*)\s+\w{0,10}\s+arasında)', QueryType.CROSSREF),
     # How — implementation details
     (r'\b(nasıl|how|çalış|implement|konfigür|ayarla|kullan|bağlan|port|sinyal|clock)\b', QueryType.HOW),
     # What — fallback
@@ -234,6 +244,38 @@ class QueryRouter:
         else:
             req_tree = self._get_req_trees_for_nodes(graph_nodes)
 
+        # ── Edge traversal for WHAT queries ──────────────────────────────
+        # Enrich context with structural edges so LLM can reason multi-hop.
+        what_edges = []
+        seen_edge_pairs: set = set()
+        _WHAT_EDGE_TYPES = (
+            "IMPLEMENTS", "CONNECTS_TO", "PROVIDES_DATA_TO",
+            "DEPENDS_ON", "CONSTRAINED_BY", "VERIFIED_BY",
+            "MOTIVATED_BY", "ANALOGOUS_TO", "REUSES_PATTERN",
+            "CONTRADICTS",
+        )
+        for node in list(graph_nodes):  # iterate copy — may grow
+            nid = node.get("node_id", "")
+            if not nid:
+                continue
+            for etype in _WHAT_EDGE_TYPES:
+                for nbr_id, eattrs in self.graph.get_neighbors(
+                    nid, edge_type=etype, direction="both"
+                ):
+                    pair = (min(nid, nbr_id), max(nid, nbr_id), etype)
+                    if pair in seen_edge_pairs:
+                        continue
+                    seen_edge_pairs.add(pair)
+                    what_edges.append({
+                        "from": nid, "to": nbr_id,
+                        "edge_type": etype, **eattrs,
+                    })
+                    # Pull neighbor node into context if missing
+                    if not any(n.get("node_id") == nbr_id for n in graph_nodes):
+                        nbr_node = self.graph.get_node(nbr_id)
+                        if nbr_node and nbr_id not in self._stale_ids:
+                            graph_nodes.append({"node_id": nbr_id, **nbr_node})
+
         project_filter = self._resolve_project(question, vector_hits)
         source_chunks = self._search_source_chunks(question, project_filter=project_filter)
 
@@ -242,6 +284,7 @@ class QueryRouter:
             query_type=QueryType.WHAT,
             vector_hits=vector_hits,
             graph_nodes=graph_nodes,
+            graph_edges=what_edges,
             req_tree=req_tree,
             source_chunks=source_chunks,
             stale_ids=self._stale_ids,
@@ -388,6 +431,16 @@ class QueryRouter:
             for nbr_id, eattrs in self.graph.get_neighbors(nid, edge_type="CONSTRAINED_BY"):
                 trace_edges.append({"from": nid, "to": nbr_id, **eattrs})
 
+            # DEPENDS_ON: data path chain traversal (e.g. axi_dma_0 → mig_7series_0)
+            for nbr_id, eattrs in self.graph.get_neighbors(nid, edge_type="DEPENDS_ON",
+                                                            direction="both"):
+                trace_edges.append({"from": nid, "to": nbr_id,
+                                    "edge_type": "DEPENDS_ON", **eattrs})
+                if nbr_id not in visited_nodes:
+                    n = self.graph.get_node(nbr_id)
+                    if n:
+                        visited_nodes[nbr_id] = {"node_id": nbr_id, **n}
+
         # Req tree for any requirements in scope
         req_tree = self._get_req_trees_for_nodes(list(visited_nodes.values()))
 
@@ -454,6 +507,29 @@ class QueryRouter:
                         if n:
                             visited_nodes[nbr_id] = {"node_id": nbr_id, **n}
 
+        # Global fallback: "tüm cross-project ilişkileri" meta-sorgusu için
+        # Eğer hiç edge bulunamadıysa ve soru ANALOGOUS_TO/CONTRADICTS hakkındaysa,
+        # graph'taki tüm cross-project edge'leri dahil et.
+        if not cross_edges:
+            q_lower = question.lower()
+            meta_signals = (
+                "analogous_to", "contradicts", "benzer yapı", "çelişki",
+                "ilişki", "benzer", "analogous", "similar", "relationship",
+                "hangi ilişki", "ne tür ilişki",
+            )
+            if any(sig in q_lower for sig in meta_signals):
+                for u, v, eattrs in self.graph._graph.edges(data=True):
+                    etype = eattrs.get("edge_type", "")
+                    if etype in ("ANALOGOUS_TO", "CONTRADICTS", "ALTERNATIVE_TO"):
+                        cross_edges.append({"from": u, "to": v, "edge_type": etype,
+                                            **{k: v2 for k, v2 in eattrs.items()
+                                               if k != "edge_type"}})
+                        for nid in (u, v):
+                            if nid not in visited_nodes:
+                                node_data = self.graph.get_node(nid)
+                                if node_data:
+                                    visited_nodes[nid] = {"node_id": nid, **node_data}
+
         # CrossRef: iki proje karşılaştırması → her iki projeden de chunk ara
         source_chunks = self._search_source_chunks(question)
 
@@ -480,9 +556,7 @@ class QueryRouter:
         ("axi_gpio_wrapper", "PROJECT-B"),  # unique RTL file for PROJECT-B
         ("lvcmos25", "PROJECT-B"),          # Nexys Video LED IOSTANDARD
         ("lvcmos12", "PROJECT-B"),          # Nexys Video switch IOSTANDARD
-        ("microblaze", "PROJECT-B"),        # PROJECT-A has no MicroBlaze
-        ("microblaze", "PROJECT-B"),
-        ("mdm_1", "PROJECT-B"),
+        # NOT: microblaze ve mdm_1 her iki projede de var — proje sinyali değil
         ("synthesis_results", "PROJECT-B"),
         ("synthesis results", "PROJECT-B"),
         # PROJECT-A (nexys_a7_dma_audio)
@@ -500,17 +574,35 @@ class QueryRouter:
         ("mm2s", "PROJECT-A"),
     ]
 
+    # Sorguda her iki proje birlikte istendiğinde → None (filtre yok, tüm projeler)
+    _BOTH_PROJECTS_RE = re.compile(
+        r'(her iki proje|iki proje\b|project.a.ve.project.b|proje.a.ve.b'
+        r'|a\s+ve\s+b\s+(?:projesi|için|proje)'
+        r'|her iki\s+(?:proje|sistem|tasarım)'
+        r'|project.a.*project.b|project.b.*project.a)',
+        re.IGNORECASE,
+    )
+
     def _resolve_project(self, question: str, vector_hits: List[Dict[str, Any]]) -> Optional[str]:
         """
-        Resolve project filter with two-tier approach:
-          1. High-confidence text keywords in the question (overrides voting)
-          2. Fall back to vector-hit node_id voting
+        Resolve project filter with three-tier approach:
+          1. Both-projects detection → None (no filter, fetch from all projects)
+          2. High-confidence text keywords → PROJECT-A or PROJECT-B
+          3. Fall back to vector-hit node_id voting
         Returns PROJECT-A, PROJECT-B, or None.
         """
         q_lower = question.lower()
+
+        # Tier 1: Her iki proje birlikte isteniyor → filtre yok
+        if self._BOTH_PROJECTS_RE.search(q_lower):
+            return None
+
+        # Tier 2: Tek proje keyword eşleşmesi
         for keyword, project in self._TEXT_PROJECT_SIGNALS:
             if keyword in q_lower:
                 return project
+
+        # Tier 3: Vector voting fallback
         return self._infer_project(vector_hits)
 
     def _infer_project(self, vector_hits: List[Dict[str, Any]]) -> Optional[str]:
@@ -584,11 +676,21 @@ class QueryRouter:
         # Standalone/wrapper RTL — for axi_gpio_wrapper.v
         "çalıştırılabilir": "standalone tied off AXI master slave s_axi_awaddr",
         "standalone": "standalone tied off AXI master cannot operate s_axi_awaddr 32'h0 1'b0",
-        # XDC constraint file retrieval (LVCMOS33 only — project-neutral)
-        "xdc": "XDC set_property PACKAGE_PIN IOSTANDARD create_clock LVCMOS33",
+        # XDC constraint file retrieval
+        "xdc": "XDC set_property PACKAGE_PIN IOSTANDARD",
+        # Configuration voltage properties (Nexys Video Master XDC)
+        "cfgbvs": "CFGBVS VCCO CONFIG_VOLTAGE set_property configuration voltage",
+        "config_voltage": "CONFIG_VOLTAGE CFGBVS VCCO set_property 3.3 current_design",
         # Peripheral/XPAR addressing
         "peripheral": "XPAR_GPIO_IN XPAR_GPIO_OUT XPAR_AXI_DMA XPAR_MIG7SERIES DDR_BASE_ADDR create_bd_addr_seg",
         "offset": "offset 0x40000000 0x41E00000 0x80000000 create_bd_addr_seg SEG_GPIO SEG_axi_dma",
+        # DDR3/DDR sorguları → MIG 7series (PROJECT-A DDR2 MIG kanalı)
+        "ddr3":   "ddr2 mig_7series MIG DDR SDRAM ui_clk mem_if_ddr2",
+        "ddr":    "mig_7series DDR2 ui_clk MIG 7series mem_if_ddr2 SDRAM",
+        # MicroBlaze cache konfigürasyon sorguları
+        "c_use_icache": "CONFIG.C_USE_ICACHE C_USE_DCACHE microblaze_0 cache 1 0 config",
+        "icache": "C_USE_ICACHE C_USE_DCACHE CONFIG microblaze cache ICache DCache",
+        "cache konfig": "C_USE_ICACHE C_USE_DCACHE CONFIG.C_USE_ICACHE {1} microblaze",
     }
 
     def _augment_query(self, question: str) -> str:
@@ -605,6 +707,11 @@ class QueryRouter:
             return question + " | " + " ".join(augments)
         return question
 
+    # Sorguda geçebilecek kaynak dosya uzantıları
+    _SOURCE_FILE_RE = re.compile(
+        r'\b([\w][\w\-]*)\.(?:tcl|v|sv|c|cpp|h|hpp|xdc|json)\b', re.IGNORECASE
+    )
+
     def _search_source_chunks(
         self,
         question: str,
@@ -614,18 +721,41 @@ class QueryRouter:
         """
         SourceChunkStore'u sorgula.
         Türkçe sorular için augmented query ile daha iyi retrieval sağlar.
+        Sorguda dosya adı geçiyorsa o dosyanın chunk'larını garantili olarak ekler.
         Store mevcut değilse boş liste döndür (graceful degradation).
         """
         if self.source_store is None:
             return []
         try:
             augmented_q = self._augment_query(question)
-            return self.source_store.search(
+
+            # File-name boost: sorguda belirtilen dosyaların en ilgili chunk'larını getir.
+            # search_within_file() kullanarak büyük dosyalarda (design_1.tcl gibi)
+            # context bloat'u önle — sadece sorguya semantik olarak en yakın N chunk döner.
+            file_chunks: List[Dict[str, Any]] = []
+            seen_ids: set = set()
+            mentioned_stems = self._SOURCE_FILE_RE.findall(question)
+            for stem in mentioned_stems:
+                for h in self.source_store.search_within_file(augmented_q, stem, n_results=8):
+                    if h["chunk_id"] not in seen_ids:
+                        seen_ids.add(h["chunk_id"])
+                        file_chunks.append(h)
+
+            # Genel semantik arama
+            general_hits = self.source_store.search(
                 augmented_q,
                 n_results=self.n_source,
                 project_filter=project_filter,
                 file_type_filter=file_type_filter,
             )
+
+            # Birleştir: dosya adı eşleşenleri önce, sonra genel sonuçlar
+            for h in general_hits:
+                if h["chunk_id"] not in seen_ids:
+                    seen_ids.add(h["chunk_id"])
+                    file_chunks.append(h)
+
+            return file_chunks
         except Exception as e:
             print(f"  [QueryRouter] Source chunk search hata: {e}")
             return []

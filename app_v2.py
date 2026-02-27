@@ -5,7 +5,7 @@ FPGA RAG v2 — Streamlit Chat Interface
 Mimari: fpga_rag_architecture_v2.md
 3-Store federated query: Vector + Graph + Req Tree
 Anti-hallüsinasyon: 6 aktif katman
-LLM: OpenAI (gpt-4o-mini varsayılan)
+LLM: Claude Code CLI (claude-sonnet-4-6, API key gerektirmez)
 """
 
 import os
@@ -121,7 +121,7 @@ def load_rag_v2():
         except Exception as e:
             sc = None  # Graceful degradation
 
-    router = QueryRouter(gs, vs, source_chunk_store=sc, n_vector_results=6, n_source_results=5)
+    router = QueryRouter(gs, vs, source_chunk_store=sc, n_vector_results=6, n_source_results=10)
     gate = HallucinationGate(gs)
 
     stats = gs.stats()
@@ -130,18 +130,8 @@ def load_rag_v2():
 
 
 def get_llm(model_name: str):
-    if model_name.startswith("claude-"):
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if not api_key or api_key.startswith("your-"):
-            return None
-        from rag.claude_generator import ClaudeGenerator
-        return ClaudeGenerator(api_key=api_key, model_name=model_name)
-    else:
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-        if not api_key or api_key.startswith("your-"):
-            return None
-        from rag.openai_generator import OpenAIGenerator
-        return OpenAIGenerator(api_key=api_key, model_name=model_name)
+    from rag.llm_factory import get_llm as _get_llm
+    return _get_llm(model_name)
 
 
 # ── Yardımcı render fonksiyonları ─────────────────────────────────────────────
@@ -224,12 +214,9 @@ with st.sidebar:
     llm_model = st.selectbox(
         "LLM Modeli",
         [
-            "claude-haiku-4-5-20251001",
             "claude-sonnet-4-6",
+            "claude-haiku-4-5-20251001",
             "claude-opus-4-6",
-            "gpt-4o-mini",
-            "gpt-4o",
-            "gpt-4-turbo",
         ],
         index=0,
     )
@@ -428,7 +415,7 @@ if prompt:
             # LLM
             st.write("🤖 LLM yanıt üretiyor…")
             from rag_v2.response_builder import build_llm_context, FPGA_RAG_SYSTEM_PROMPT
-            ctx = build_llm_context(qr, gr, max_nodes=10)
+            ctx = build_llm_context(qr, gr, max_nodes=12, max_chars=14000)
 
             system = FPGA_RAG_SYSTEM_PROMPT.split("CONTEXT:")[0].strip()
 
@@ -446,11 +433,18 @@ if prompt:
                     llm_answer = f"⚠️ LLM hatası: {e}"
             else:
                 llm_answer = (
-                    "⚠️ **API key ayarlanmamış.**\n\n"
-                    "Claude modelleri için `.env` dosyasına `ANTHROPIC_API_KEY=sk-ant-...` ekleyin.\n\n"
-                    "OpenAI modelleri için `OPENAI_API_KEY=sk-...` ekleyin.\n\n"
-                    "Ardından uygulamayı yeniden başlatın."
+                    "⚠️ **LLM başlatılamadı.**\n\n"
+                    "Claude Code CLI kurulu ve giriş yapılmış olmalı.\n\n"
+                    "`claude --version` komutuyla kontrol edin."
                 )
+
+            # Grounding check — LLM cevabındaki değerleri context'e karşı doğrula
+            if llm_answer and not llm_answer.startswith("⚠️"):
+                from rag_v2.grounding_checker import GroundingChecker
+                sc_chunks = getattr(qr, "source_chunks", [])
+                grounding_warns = GroundingChecker().check(llm_answer, sc_chunks, qr.graph_nodes)
+                if grounding_warns:
+                    gr.warnings.extend(grounding_warns)
 
             elapsed = round(time.time() - t0, 1)
             status.update(label=f"✅ Tamamlandı ({elapsed}s)", state="complete")

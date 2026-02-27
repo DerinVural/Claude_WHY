@@ -131,7 +131,7 @@ TEST_CASES = [
         "category": "Sentez Sonuçları ve Kaynak Kullanımı",
         "difficulty": "Orta",
         "domain": "Sentez",
-        "question": "Bu projenin sentez sonuçlarına göre kaç LUT, BRAM ve DSP kullanılmış? Synthesis süresi ne kadar? Kaynak kullanımı düşük mü?",
+        "question": "axi_gpio_example projesinin `SYNTHESIS_RESULTS.md` raporuna göre `microblaze_bd_wrapper` sentezinde kaç Slice LUT ve BRAM Tile kullanılmış? LUT Utilization yüzdesi nedir? DSP kullanımı var mı? Synthesis başarılı mı?",
         "key_terms": ["LUT", "BRAM", "synthesis", "microblaze_bd_wrapper", "Utilization"],
         "key_values": ["1,412", "1.05"],
         "key_files": ["SYNTHESIS_RESULTS.md"],
@@ -198,7 +198,7 @@ TEST_CASES = [
         "category": "DMA Transfer Modu",
         "difficulty": "Kolay",
         "domain": "Yazılım",
-        "question": "AXI DMA IP'si Scatter-Gather modunda mı yoksa Direct Register modunda mı çalışıyor? `XAxiDma_HasSg` kontrolü ne söylüyor? MM2S ve S2MM transferleri `dma_send`/`dma_receive` fonksiyonlarında nasıl başlatılıyor? Transfer tamamlanana kadar `XAxiDma_Busy` polling ile mi bekleniyor?",
+        "question": "AXI DMA IP'si Scatter-Gather modunda mı yoksa Direct Register modunda mı çalışıyor? `XAxiDma_HasSg` kontrolü ne söylüyor? MM2S ve S2MM transferleri `dma_send`/`dma_receive` fonksiyonlarında nasıl başlatılıyor? Transfer tamamlanana kadar `XAxiDma_Busy` polling ile mi bekleniyor? `dma_forward` içindeki `BUFFER_SIZE_WORDS` kaç word olarak tanımlanmış?",
         "key_terms": ["XAxiDma_HasSg", "Direct Register", "XAxiDma_SimpleTransfer", "MM2S", "polling"],
         "key_values": ["256", "BUFFER_SIZE"],
         "key_files": ["helloworld.c"],
@@ -369,16 +369,8 @@ def load_v2_system():
 
 
 def get_llm():
-    # Claude öncelikli — kredi yoksa OpenAI fallback
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if anthropic_key and not anthropic_key.startswith("your-"):
-        from rag.claude_generator import ClaudeGenerator
-        return ClaudeGenerator(api_key=anthropic_key, model_name="claude-haiku-4-5-20251001")
-    openai_key = os.environ.get("OPENAI_API_KEY", "")
-    if openai_key and not openai_key.startswith("your-"):
-        from rag.openai_generator import OpenAIGenerator
-        return OpenAIGenerator(api_key=openai_key, model_name="gpt-4o-mini")
-    return None
+    from rag.llm_factory import get_llm as _get_llm
+    return _get_llm("claude-sonnet-4-6")
 
 
 def run_question(question: str, router, gate, llm, system_prompt: str) -> Dict:

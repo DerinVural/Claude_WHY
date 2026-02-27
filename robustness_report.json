@@ -1,0 +1,273 @@
+{
+  "timestamp": "2026-02-26T14:12:36.306029",
+  "total_score": 0.94,
+  "overall_grade": "A",
+  "elapsed_s": 383.5,
+  "tests": [
+    {
+      "test": "A_held_out_file",
+      "score": 1.0,
+      "grade": "A",
+      "faz1_score": 1.0,
+      "faz2_score": 1.0,
+      "faz3_score": 1.0,
+      "faz1_design1_indexed": true,
+      "faz2_says_unknown": true,
+      "faz2_still_hallucinated": true,
+      "faz3_recovered": true,
+      "held_out_chunks": 39,
+      "restored_chunks": 39
+    },
+    {
+      "test": "B_fabrication_recall",
+      "score": 0.974,
+      "grade": "A",
+      "precision": 1.0,
+      "recall": 0.95,
+      "f1": 0.974,
+      "trap_results": [
+        {
+          "id": "B-TRAP-1",
+          "note": "axis2fifo içi FIFO derinliği kaynak kodda tanımlanmamış",
+          "score": 1.0,
+          "verdict": "PASS",
+          "says_unknown": true,
+          "hallucination_detected": false,
+          "hallucination_values": [],
+          "answer_snippet": "## axis2fifo Modülü — FIFO Derinliği ve Latency\n\n### Context'teki Mevcut Bilgiler\n\nSağlanan context'te **axis2fifo** modülünün iç parametreleri (FIFO derinliği / stage sayısı, minimum latency) hakkınd"
+        },
+        {
+          "id": "B-TRAP-2",
+          "note": "Projede donanım test metodolojisi veya THD ölçümü belgelenmemiş — sadece RTL kodu var",
+          "score": 1.0,
+          "verdict": "PASS",
+          "says_unknown": true,
+          "hallucination_detected": false,
+          "hallucination_values": [],
+          "answer_snippet": "## Yanıt\n\nContext'te bu soruya verilecek bilgi **bulunamamaktadır**.\n\nSağlanan kaynak dosyalar ve node'lar incelendiğinde:\n\n- **Test ekipmanı**: `tone_generator` modülünün frekans doğruluğunu doğrulam"
+        },
+        {
+          "id": "B-TRAP-3",
+          "note": "create_minimal_microblaze.tcl MicroBlaze'i NO_CACHE ile oluşturuyor",
+          "score": 1.0,
+          "verdict": "PASS",
+          "says_unknown": true,
+          "hallucination_detected": false,
+          "hallucination_values": [],
+          "answer_snippet": "## MicroBlaze L1 Data Cache — Nexys Video Projesi\n\nBu sorunun yanıtı context'teki kaynak dosyalarda **açıkça belirtilmemiştir**.\n\n### Context'te Bulunan Bilgi\n\n**AXI-REQ-L2-002** node'una göre:\n\n> *\"M"
+        },
+        {
+          "id": "B-TRAP-4",
+          "note": "Projede I2S yok, PWM audio kullanıyor — BCLK/MCLK/LRCLK gibi I2S-spesifik değerler hallucination",
+          "score": 1.0,
+          "verdict": "PASS",
+          "says_unknown": true,
+          "hallucination_detected": false,
+          "hallucination_values": [],
+          "answer_snippet": "## Yanıt: I2S Audio Interface Hakkında\n\nContext'te yapılan incelemeye göre, **bu projede I2S audio interface kullanılmamaktadır.**\n\n### Projede Kullanılan Ses Arayüzü\n\nBu proje (Nexys-A7-100T-DMA-Audi"
+        }
+      ],
+      "real_results": [
+        {
+          "id": "B-REAL-1",
+          "note": "design_1.tcl: microblaze_0 CONFIG.C_USE_ICACHE {1} CONFIG.C_USE_DCACHE {1}",
+          "score": 1.0,
+          "term_hits": [
+            "C_USE_ICACHE",
+            "C_USE_DCACHE",
+            "1",
+            "etkin"
+          ],
+          "val_hits": [
+            "1"
+          ],
+          "source_chunks": 12,
+          "chunk_files": [
+            "design_1.tcl",
+            "helloworld.c"
+          ]
+        },
+        {
+          "id": "B-REAL-2",
+          "note": "add_axi_gpio.tcl: CONFIG.C_GPIO_WIDTH {8}",
+          "score": 1.0,
+          "term_hits": [
+            "C_GPIO_WIDTH",
+            "8",
+            "axi_gpio_0"
+          ],
+          "val_hits": [
+            "8"
+          ],
+          "source_chunks": 12,
+          "chunk_files": [
+            "create_axi_simple_gpio.tcl",
+            "add_axi_gpio.tcl",
+            "axi_gpio_wrapper.v",
+            "SYNTHESIS_RESULTS.md",
+            "create_axi_simple.tcl"
+          ]
+        },
+        {
+          "id": "B-REAL-3",
+          "note": "nexys_video.xdc: R4 = CLK100MHZ, LVCMOS33",
+          "score": 0.8,
+          "term_hits": [
+            "R4",
+            "clk"
+          ],
+          "val_hits": [
+            "R4"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "Nexys-Video-Master.xdc"
+          ]
+        },
+        {
+          "id": "B-REAL-4",
+          "note": "helloworld.c satır 60-64: SG modu tespit edilirse XST_FAILURE döner",
+          "score": 1.0,
+          "term_hits": [
+            "XAxiDma_HasSg",
+            "XST_FAILURE",
+            "scatter",
+            "init_dma"
+          ],
+          "val_hits": [
+            "XST_FAILURE"
+          ],
+          "source_chunks": 12,
+          "chunk_files": [
+            "helloworld.c"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "C_multihop_traversal",
+      "score": 0.911,
+      "grade": "A",
+      "questions": [
+        {
+          "id": "C-HOP-1",
+          "hops": 2,
+          "score": 1.0,
+          "graph_nodes_retrieved": 54,
+          "graph_edges_retrieved": 127,
+          "node_coverage": 1.0,
+          "node_hits": [
+            "mig_7series_0",
+            "axi_dma_0",
+            "axis2fifo",
+            "fifo2audpwm"
+          ],
+          "node_misses": [],
+          "has_enough_nodes": true,
+          "has_enough_edges": true
+        },
+        {
+          "id": "C-HOP-2",
+          "hops": 2,
+          "score": 0.867,
+          "graph_nodes_retrieved": 35,
+          "graph_edges_retrieved": 64,
+          "node_coverage": 0.667,
+          "node_hits": [
+            "microblaze_0",
+            "axi_gpio_0"
+          ],
+          "node_misses": [
+            "microblaze_0_axi_periph"
+          ],
+          "has_enough_nodes": true,
+          "has_enough_edges": true
+        },
+        {
+          "id": "C-HOP-3",
+          "hops": 3,
+          "score": 0.867,
+          "graph_nodes_retrieved": 46,
+          "graph_edges_retrieved": 96,
+          "node_coverage": 0.667,
+          "node_hits": [
+            "tone_generator_0",
+            "TONE_GEN"
+          ],
+          "node_misses": [
+            "DMA_AUDIO"
+          ],
+          "has_enough_nodes": true,
+          "has_enough_edges": true
+        }
+      ]
+    },
+    {
+      "test": "D_cross_project",
+      "score": 0.772,
+      "grade": "B",
+      "questions": [
+        {
+          "id": "D-CROSS-1",
+          "score": 0.4,
+          "term_coverage": 0.4,
+          "term_hits": [
+            "clk_wiz",
+            "benzer"
+          ],
+          "cross_project_refs": false,
+          "proj_a_referenced": true,
+          "proj_b_referenced": false,
+          "graph_edges": 39,
+          "notes": "ANALOGOUS_TO edge var: COMP-A-clk_wiz_0 ↔ COMP-B-clk_wiz_0"
+        },
+        {
+          "id": "D-CROSS-2",
+          "score": 0.917,
+          "term_coverage": 0.833,
+          "term_hits": [
+            "microblaze",
+            "mdm",
+            "cache",
+            "debug",
+            "her iki"
+          ],
+          "cross_project_refs": true,
+          "proj_a_referenced": true,
+          "proj_b_referenced": true,
+          "graph_edges": 8,
+          "notes": "İki projede de microblaze_0 var, farklı cache/debug config"
+        },
+        {
+          "id": "D-CROSS-3",
+          "score": 1.0,
+          "term_coverage": 1.0,
+          "term_hits": [
+            "analogous",
+            "benzer",
+            "çelişki",
+            "contradicts",
+            "cross"
+          ],
+          "cross_project_refs": true,
+          "proj_a_referenced": true,
+          "proj_b_referenced": true,
+          "graph_edges": 9,
+          "notes": "CrossRef route ile ANALOGOUS_TO/REUSES_PATTERN edge'leri gelecek"
+        }
+      ]
+    },
+    {
+      "test": "E_contradiction_detection",
+      "score": 1.0,
+      "grade": "A",
+      "faz1_baseline_clean": true,
+      "faz2_warning_fired": true,
+      "faz2_conflict_mentioned": true,
+      "faz2_both_modes_mentioned": true,
+      "crossref_new_edges": 9,
+      "faz1_score": 1.0,
+      "faz2_score": 1.0
+    }
+  ]
+}

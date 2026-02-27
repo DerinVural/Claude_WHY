@@ -43,7 +43,6 @@ PROJECT_SOURCE_CATALOG = [
         "display_name": "Nexys A7 DMA Audio",
         "roots": [
             str(_ROOT / "data/code/Nexys-A7-100T-DMA-Audio"),
-            str(_ROOT / "data/code/Nexys-A7-50T-DMA-Audio"),
         ],
         # Dahil edilecek uzantılar (.md hariç: Türkçe içerik gürültü yaratıyor)
         "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".json"],
@@ -75,6 +74,7 @@ PROJECT_SOURCE_CATALOG = [
         "exclude_patterns": [".git", "__pycache__", "vivado_minimal_mb", "RUN_AXI"],
         "file_node_map": {
             "nexys_video.xdc": ["COMP-B-clk_wiz_0", "COMP-B-rst_clk_wiz_0_100M"],
+            "Nexys-Video-Master.xdc": ["COMP-B-clk_wiz_0"],
             "axi_gpio_wrapper.v": ["COMP-B-axi_gpio_wrapper"],
             "add_axi_gpio.tcl": ["COMP-B-axi_gpio_0", "COMP-B-microblaze_0_axi_periph"],
             "create_minimal_microblaze.tcl": ["COMP-B-microblaze_0", "COMP-B-clk_wiz_0", "COMP-B-mdm_1"],
@@ -82,9 +82,12 @@ PROJECT_SOURCE_CATALOG = [
             "utilization_summary.txt": ["COMP-B-microblaze_0", "COMP-B-clk_wiz_0"],
             "SYNTHESIS_RESULTS.md": ["COMP-B-microblaze_0", "COMP-B-axi_gpio_0", "COMP-B-clk_wiz_0"],
         },
-        # Belirli dosyaları uzantıdan bağımsız olarak ekle (synthesis results, address maps)
+        # SYNTHESIS_RESULTS.md: extension filter bypass ile ekleniyor (.md hariç tutuluyor ama
+        # bu dosya kritik sentez verisini içeriyor — LUT:1,412 / microblaze_bd_wrapper)
         "specific_files": [
             str(Path.home() / "Desktop/fpga_asist_dev-master/fpga_asist_dev-master/validation_test/axi_example/SYNTHESIS_RESULTS.md"),
+            # Nexys Video Master XDC: CFGBVS=VCCO, CONFIG_VOLTAGE=3.3 ve board pin referansı için
+            str(Path(__file__).parent.parent / "data/code/digilent-xdc/Nexys-Video-Master.xdc"),
         ],
     },
 ]

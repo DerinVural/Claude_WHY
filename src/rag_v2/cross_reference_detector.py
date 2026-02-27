@@ -44,10 +44,37 @@ MIN_BASE_NAME_LEN        = 4
 _GENERIC_TYPES = {"rtl_module", "rtl_module_vhdl", "ip_core", "component", "module"}
 
 # Vocabulary for contradiction detection
-_POSITIVE_TERMS = {"seçildi", "kullanıldı", "tercih", "önerilir", "gerekli",
-                   "zorunlu", "uygun", "selected", "preferred", "required"}
-_NEGATIVE_TERMS = {"elendi", "reddedildi", "kullanılmaz", "önerilmez",
-                   "gereksiz", "alternatif", "rejected", "eliminated", "unnecessary"}
+_POSITIVE_TERMS = {
+    "seçildi", "kullanıldı", "tercih", "önerilir", "gerekli",
+    "zorunlu", "uygun", "selected", "preferred", "required",
+    "etkin", "aktif", "enabled", "active", "kullanılıyor",
+    "uygulandı", "implemented", "tercih edildi", "benimsendi",
+    "çalışıyor", "works", "operational", "configured",
+}
+_NEGATIVE_TERMS = {
+    "elendi", "reddedildi", "kullanılmaz", "önerilmez",
+    "gereksiz", "alternatif", "rejected", "eliminated", "unnecessary",
+    "devre dışı", "disabled", "kapalı", "inactive", "iptal",
+    "kullanılmıyor", "not used", "not enabled", "not configured",
+    "yetersiz", "insufficient", "problematic", "sorunlu",
+    "çalışmıyor", "not working", "broken", "hatalı",
+}
+
+# Mutually-exclusive mode pairs — (set_A, set_B) where A and B are opposing choices.
+# If one decision text matches set_A and another matches set_B → contradiction.
+_MUTEX_MODE_PAIRS: list = [
+    # DMA mode: scatter-gather vs simple
+    ({"scatter-gather", "sg mode", "scatter gather", "sg modu"},
+     {"simple dma", "simple mode", "simpledma", "basit dma"}),
+    # Cache enabled vs disabled
+    ({"cache etkin", "c_use_icache {1}", "icache enabled", "cache aktif"},
+     {"cache devre dışı", "c_use_icache {0}", "icache disabled", "cache kapalı"}),
+    # SG mode selected vs rejected
+    ({"sg modu seçildi", "sg seçildi", "scatter-gather seçildi",
+      "scatter-gather etkinleştirildi", "sg mode selected"},
+     {"sg modu reddedildi", "sg elendi", "scatter-gather reddedildi",
+      "simple dma seçildi", "simple dma tercih", "basit dma seçildi"}),
+]
 
 
 # ---------------------------------------------------------------------------
@@ -285,56 +312,90 @@ class CrossReferenceDetector:
         self, decisions: List[Dict]
     ) -> List[Tuple[str, str, str, str, str]]:
         """
-        Find DECISION pairs from different projects with:
-          (a) high topic similarity (cosine >= CONTRADICTION_THRESHOLD), AND
-          (b) opposing outcome language (one positive, one negative).
+        Find DECISION pairs with contradicting outcomes via 3 strategies:
+
+        Strategy A (classic): high topic similarity + opposing pos/neg language
+        Strategy B (same project): same-project decisions where one is pos, other neg
+          about the same technical topic (e.g. "SG mode enabled" vs "SG rejected")
+        Strategy C (mutex modes): detect mutually exclusive mode claims in the
+          combined text of two similar decisions (e.g. scatter-gather vs simple DMA)
         """
         results: List[Tuple] = []
         seen_pairs: set = set()
 
+        def _add(did: str, oid: str, evidence: str):
+            pair = tuple(sorted([did, oid]))
+            if pair not in seen_pairs:
+                seen_pairs.add(pair)
+                results.append((did, oid, "CONTRADICTS", "MEDIUM", evidence))
+
+        def _mutex_conflict(text_a: str, text_b: str) -> Optional[str]:
+            """Return evidence if texts A and B claim mutually exclusive modes."""
+            for side_a, side_b in _MUTEX_MODE_PAIRS:
+                a_in_a = any(m in text_a for m in side_a)
+                b_in_b = any(m in text_b for m in side_b)
+                a_in_b = any(m in text_b for m in side_a)
+                b_in_a = any(m in text_a for m in side_b)
+                if (a_in_a and b_in_b) or (a_in_b and b_in_a):
+                    matched_a = [m for m in side_a if m in text_a or m in text_b][:2]
+                    matched_b = [m for m in side_b if m in text_a or m in text_b][:2]
+                    return f"Mutex mode conflict: {matched_a} vs {matched_b}"
+            return None
+
         for dec in decisions:
             did  = dec["node_id"]
             dprj = dec.get("project")
-            query = " ".join([
-                str(dec.get("title",       "")),
+            dec_text = " ".join([
+                str(dec.get("title", "")),
                 str(dec.get("description", "")),
-            ])
+                str(dec.get("outcome", "")),
+            ]).lower()
+
+            query = dec_text[:512]
 
             try:
-                hits = self.vs.query(query, n_results=8, node_type_filter="DECISION")
+                hits = self.vs.query(query, n_results=10, node_type_filter="DECISION")
                 for hit in hits:
                     oid = hit["node_id"]
                     if oid == did:
                         continue
                     other = self.gs.get_node(oid)
-                    if not other or other.get("project") == dprj:
+                    if not other:
                         continue
                     sim = hit.get("similarity", 0.0)
-                    if sim < CONTRADICTION_THRESHOLD:
-                        continue
 
-                    dec_text   = str(dec.get("description",   "")).lower()
-                    other_text = str(other.get("description", "")).lower()
+                    other_text = " ".join([
+                        str(other.get("title", "")),
+                        str(other.get("description", "")),
+                        str(other.get("outcome", "")),
+                    ]).lower()
 
-                    dec_pos   = any(t in dec_text   for t in _POSITIVE_TERMS)
-                    dec_neg   = any(t in dec_text   for t in _NEGATIVE_TERMS)
-                    other_pos = any(t in other_text for t in _POSITIVE_TERMS)
-                    other_neg = any(t in other_text for t in _NEGATIVE_TERMS)
+                    # Strategy A — cross-project, opposing pos/neg, high sim
+                    if other.get("project") != dprj and sim >= CONTRADICTION_THRESHOLD:
+                        dec_pos   = any(t in dec_text   for t in _POSITIVE_TERMS)
+                        dec_neg   = any(t in dec_text   for t in _NEGATIVE_TERMS)
+                        other_pos = any(t in other_text for t in _POSITIVE_TERMS)
+                        other_neg = any(t in other_text for t in _NEGATIVE_TERMS)
+                        if (dec_pos and other_neg) or (dec_neg and other_pos):
+                            _add(did, oid,
+                                 f"Strategy-A: topic_sim={sim:.4f} + opposing outcome language")
 
-                    is_contradiction = (
-                        (dec_pos and other_neg) or (dec_neg and other_pos)
-                    )
-                    if not is_contradiction:
-                        continue
+                    # Strategy B — same project, lower threshold, opposing language
+                    elif other.get("project") == dprj and sim >= 0.75:
+                        dec_pos   = any(t in dec_text   for t in _POSITIVE_TERMS)
+                        dec_neg   = any(t in dec_text   for t in _NEGATIVE_TERMS)
+                        other_pos = any(t in other_text for t in _POSITIVE_TERMS)
+                        other_neg = any(t in other_text for t in _NEGATIVE_TERMS)
+                        if (dec_pos and other_neg) or (dec_neg and other_pos):
+                            _add(did, oid,
+                                 f"Strategy-B: same-project contradicting decisions (sim={sim:.4f})")
 
-                    pair = tuple(sorted([did, oid]))
-                    if pair in seen_pairs:
-                        continue
-                    seen_pairs.add(pair)
-                    results.append((
-                        did, oid, "CONTRADICTS", "MEDIUM",
-                        f"Topic sim {sim:.4f} + opposing outcome language",
-                    ))
+                    # Strategy C — mutex mode conflict (any project, sim >= 0.60)
+                    if sim >= 0.60:
+                        evidence = _mutex_conflict(dec_text, other_text)
+                        if evidence:
+                            _add(did, oid, f"Strategy-C: {evidence} (sim={sim:.4f})")
+
             except Exception:
                 pass
 

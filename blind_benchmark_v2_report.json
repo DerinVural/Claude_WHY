@@ -1,0 +1,827 @@
+{
+  "timestamp": "2026-02-26T14:22:37.460203",
+  "version": "v2",
+  "total_score": 0.918,
+  "overall_grade": "A",
+  "elapsed_s": 412.7,
+  "n_questions": 26,
+  "categories": [
+    {
+      "category": "ip_config",
+      "label": "IP Config  (design_1.tcl, PROJECT-A)",
+      "score": 0.976,
+      "grade": "A",
+      "n_questions": 5,
+      "questions": [
+        {
+          "id": "IP-01",
+          "category": "ip_config",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "230400",
+            "baud",
+            "uart",
+            "C_BAUDRATE"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "230400"
+          ],
+          "val_misses": [],
+          "source_chunks": 14,
+          "chunk_files": [
+            "platform.c",
+            "Nexys-A7-100T-Master.xdc",
+            "helloworld.c",
+            "design_1.tcl",
+            "platform.h"
+          ],
+          "query_type": "How",
+          "answer_snippet": "## AXI UARTLite `C_BAUDRATE` Konfigürasyon Değeri\n\n### Kaynak Değer\n\n`design_1.tcl` dosyasının 521–528. satırlarına göre:\n\n```tcl\nset axi_uartlite_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_uartlite:2.0 axi_uartlite_0 ]\nset_property -dict [ list \\\n   CONFIG.C_BAUDRATE {230400} \\\n   CONFIG.U",
+          "ground_truth": "design_1.tcl: CONFIG.C_BAUDRATE {230400}"
+        },
+        {
+          "id": "IP-02",
+          "category": "ip_config",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "256",
+            "burst",
+            "scatter",
+            "sg",
+            "c_include_sg"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "256"
+          ],
+          "val_misses": [],
+          "source_chunks": 15,
+          "chunk_files": [
+            "Nexys-A7-100T-Master.xdc",
+            "design_1.tcl",
+            "helloworld.c"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## AXI DMA 0 IP Konfigürasyonu\n\nKaynak dosyadan (`design_1.tcl`, satır 502-514) doğrudan alınan değerler:\n\n### Burst Size Parametreleri\n\n| Parametre | Değer |\n|-----------|-------|\n| `CONFIG.c_mm2s_burst_size` | **256** |\n| `CONFIG.c_s2mm_burst_size` | **256** |\n\n### Scatter-Gather Modu\n\n| Parametre",
+          "ground_truth": "design_1.tcl: c_mm2s_burst_size=256, c_s2mm_burst_size=256, c_include_sg=0"
+        },
+        {
+          "id": "IP-03",
+          "category": "ip_config",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "24.576",
+            "CLKOUT2",
+            "audio",
+            "clk_wiz",
+            "MHz"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "24.576"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "design_1.tcl",
+            "Nexys-A7-100T-Master.xdc"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## clk_wiz_0 — CLKOUT2 Frekansı ve Hedef Bileşen\n\n### CLKOUT2 Frekansı\n\n`design_1.tcl` dosyasının **539-560. satırları**nda clk_wiz_0 IP konfigürasyonu açıkça belirtilmiştir:\n\n```tcl\nCONFIG.CLKOUT2_REQUESTED_OUT_FREQ {24.576} \\\nCONFIG.CLKOUT2_USED {true} \\\n```\n\n**CLKOUT2 frekansı: `24.576 MHz`**\n\nBu",
+          "ground_truth": "design_1.tcl: CLKOUT2_REQUESTED_OUT_FREQ=24.576 MHz (audio clock)"
+        },
+        {
+          "id": "IP-04",
+          "category": "ip_config",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "4096",
+            "4093",
+            "fifo",
+            "depth",
+            "threshold"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "4096",
+            "4093"
+          ],
+          "val_misses": [],
+          "source_chunks": 11,
+          "chunk_files": [
+            "fifo2audpwm.v",
+            "design_1.tcl",
+            "Nexys-A7-100T-Master.xdc"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## FIFO Generator IP Parametreleri\n\n`nexys_a7_dma_audio` projesindeki `fifo_generator_0` IP parametreleri hakkında bilgi, **COMP-A-fifo_generator_0** node'undan elde edilmektedir:\n\n---\n\n### FIFO Generator v13.2 Parametreleri\n\n| Parametre | Değer |\n|---|---|\n| **Input_Depth** | 4096 |\n| **Output_Dept",
+          "ground_truth": "design_1.tcl: Input_Depth=4096, Output_Depth=4096, Full_Threshold_Assert_Value=4093"
+        },
+        {
+          "id": "IP-05",
+          "category": "ip_config",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.88,
+          "term_hits": [
+            "128",
+            "DDR2",
+            "CAS",
+            "AXI"
+          ],
+          "term_misses": [
+            "data width"
+          ],
+          "val_hits": [
+            "128",
+            "5"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "design_1.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## MIG 7-Series AXI Parametreleri\n\n### C0_S_AXI_DATA_WIDTH\n\n`design_1.tcl` kaynak dosyasından (part 5) doğrudan alınan değer:\n\n```xml\n<C0_S_AXI_DATA_WIDTH>128</C0_S_AXI_DATA_WIDTH>\n```\n\n**AXI data genişliği: 128 bit** olarak ayarlanmıştır.\n\nAynı bölümden diğer AXI parametreleri de şu şekildedir:\n\n| ",
+          "ground_truth": "design_1.tcl: C0_S_AXI_DATA_WIDTH=128, CAS_Latency=5"
+        }
+      ]
+    },
+    {
+      "category": "rtl_deep",
+      "label": "RTL Deep   (fifo2audpwm, PROJECT-A)",
+      "score": 1.0,
+      "grade": "A",
+      "n_questions": 5,
+      "questions": [
+        {
+          "id": "RTL-01",
+          "category": "rtl_deep",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "count",
+            "duty",
+            "DATA_WIDTH",
+            "9:8",
+            "7:0",
+            "karşılaştır"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "count[9:8]",
+            "count[7:0]"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "fifo2audpwm.v",
+            "create_axi_simple.tcl",
+            "platform.c",
+            "design_1.tcl",
+            "platform.h",
+            "create_axi_auto.tcl"
+          ],
+          "query_type": "CrossRef",
+          "answer_snippet": "# `fifo2audpwm.v` — `aud_pwm` Sinyal Üretimi\n\n## Kaynak: `fifo2audpwm.v` satır 38\n\n```verilog\nassign aud_pwm = count[DATA_WIDTH-1:0] <= duty[count[DATA_WIDTH+1:DATA_WIDTH]];\n```\n\n---\n\n## `count` Register'ının Yapısı\n\nModül parametreleri: `DATA_WIDTH = 8`, dolayısıyla `count` register'ı **`DATA_WIDTH",
+          "ground_truth": "fifo2audpwm.v: aud_pwm = count[7:0] <= duty[count[9:8]]"
+        },
+        {
+          "id": "RTL-02",
+          "category": "rtl_deep",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "fifo_rd_en",
+            "fifo_empty",
+            "&count",
+            "reduction",
+            "1"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "&count",
+            "fifo_empty"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "fifo2audpwm.v",
+            "design_1.tcl",
+            "Nexys-A7-100T-Master.xdc"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## `fifo2audpwm.v` — `fifo_rd_en` Sinyal Analizi\n\n### `fifo_rd_en` Aktif Olma Koşulu\n\nKaynak dosyadan (`fifo2audpwm.v`, satır 23):\n\n```verilog\nassign fifo_rd_en = (fifo_empty == 0 && &count == 1'b1);\n```\n\n`fifo_rd_en` sinyali **iki koşulun aynı anda sağlanması** durumunda aktif (`1`) olur:\n\n| Koşul ",
+          "ground_truth": "fifo2audpwm.v: fifo_rd_en = (fifo_empty == 0 && &count == 1'b1) — &count is bitwise AND reduction"
+        },
+        {
+          "id": "RTL-03",
+          "category": "rtl_deep",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "duty[3]",
+            "duty[1]",
+            "31:24",
+            "15:8",
+            "8:0",
+            "9 bit"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "duty[3]",
+            "duty[1]"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "fifo2audpwm.v",
+            "Nexys-A7-100T-Master.xdc",
+            "helloworld.c",
+            "design_1.tcl",
+            "platform.h"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## fifo2audpwm.v — FIFO Veri Atamaları\n\n### fifo_rd_data bit alanlarının duty kanallarına atanması\n\nKaynak dosya `fifo2audpwm.v` satır 29-32'ye göre:\n\n```verilog\nduty[0] <= fifo_rd_data[7:0];\nduty[1] <= fifo_rd_data[15:8];\nduty[2] <= fifo_rd_data[23:16];\nduty[3] <= fifo_rd_data[31:24];\n```\n\n| fifo_r",
+          "ground_truth": "fifo2audpwm.v: duty[3]<=fifo_rd_data[31:24], duty[1]<=fifo_rd_data[15:8], duty is [DATA_WIDTH:0]=[8:0]"
+        },
+        {
+          "id": "RTL-04",
+          "category": "rtl_deep",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "axis_tkeep",
+            "axis_tlast",
+            "unused",
+            "kullanılmıyor",
+            "paket"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "axis_tkeep",
+            "axis_tlast"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "fifo2audpwm.v",
+            "platform.c",
+            "helloworld.c",
+            "design_1.tcl",
+            "platform.h",
+            "axis2fifo.v"
+          ],
+          "query_type": "Why",
+          "answer_snippet": "# axis2fifo.v — Kullanılmayan Portlar ve AXI-Stream Protokolü Analizi\n\n## Kullanılmayan Olarak İşaretlenen Portlar\n\n`axis2fifo.v` kaynak dosyasına göre (satır 1-36), aşağıdaki portlar açıkça `// unused` yorumuyla işaretlenmiştir:\n\n| Port | Yön | Genişlik | Durum |\n|------|-----|----------|-------|\n|",
+          "ground_truth": "axis2fifo.v: axis_tkeep and axis_tlast are unused (/* unused */)"
+        },
+        {
+          "id": "RTL-05",
+          "category": "rtl_deep",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "aud_en",
+            "fifo_empty",
+            "0",
+            "ses",
+            "audio"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "fifo_empty"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "fifo2audpwm.v",
+            "design_1.tcl",
+            "Nexys-A7-100T-Master.xdc"
+          ],
+          "query_type": "How",
+          "answer_snippet": "## `fifo2audpwm.v` — `aud_en` Sinyalinin Davranışı\n\n### `aud_en = 0` Koşulu\n\nKaynak dosyaya göre (`fifo2audpwm.v`, satır 23-36):\n\n```verilog\nalways@(posedge clk)\n    if (&count == 1'b1) begin   // count tüm bitleri 1 olduğunda (overflow)\n        count <= 0;\n        if (fifo_empty == 0) begin\n       ",
+          "ground_truth": "fifo2audpwm.v: aud_en <= 0 when fifo_empty == 1 (FIFO boş olduğunda audio amplifier kapatılır)"
+        }
+      ]
+    },
+    {
+      "category": "c_advanced",
+      "label": "C Advanced (helloworld.c, PROJECT-A)",
+      "score": 0.976,
+      "grade": "A",
+      "n_questions": 5,
+      "questions": [
+        {
+          "id": "CA-01",
+          "category": "c_advanced",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "DMA_RESET_TIMEOUT_CNT",
+            "DMA_BUSY_TIMEOUT_CNT",
+            "1000000",
+            "2000000"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "1000000",
+            "2000000"
+          ],
+          "val_misses": [],
+          "source_chunks": 12,
+          "chunk_files": [
+            "helloworld.c"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## helloworld.c — Timeout Sabitleri\n\n### Tanımlı Değerler\n\n`helloworld.c` dosyasının **1-24. satırları** (includes_defines bölümü) aşağıdaki sabitleri açıkça tanımlamaktadır:\n\n```c\n#define DMA_RESET_TIMEOUT_CNT  1000000U\n#define DMA_BUSY_TIMEOUT_CNT   2000000U\n```\n\n| Sabit | Değer | Tip |\n|---|---|-",
+          "ground_truth": "helloworld.c: #define DMA_RESET_TIMEOUT_CNT 1000000U, DMA_BUSY_TIMEOUT_CNT 2000000U"
+        },
+        {
+          "id": "CA-02",
+          "category": "c_advanced",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "DEMO_MODE_PAUSED",
+            "0",
+            "HW_TONE_GEN",
+            "SW_TONE_GEN",
+            "RECV_WAV",
+            "PLAY_WAV"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "0",
+            "5"
+          ],
+          "val_misses": [],
+          "source_chunks": 11,
+          "chunk_files": [
+            "tone_generator.v",
+            "helloworld.c"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## helloworld.c — DemoMode Enum Analizi\n\n### DEMO_MODE_PAUSED Değeri\n\nKaynak dosyaya göre (`helloworld.c`, satır 17-24):\n\n```c\ntypedef enum DemoMode {\n    DEMO_MODE_PAUSED = 0,\n    DEMO_MODE_HW_TONE_GEN,\n    DEMO_MODE_SW_TONE_GEN,\n    DEMO_MODE_RECV_WAV_FILE,\n    DEMO_MODE_PLAY_WAV_FILE\n} DemoMode;\n",
+          "ground_truth": "helloworld.c: DemoMode enum — PAUSED=0, HW_TONE_GEN, SW_TONE_GEN, RECV_WAV_FILE, PLAY_WAV_FILE (5 mode)"
+        },
+        {
+          "id": "CA-03",
+          "category": "c_advanced",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "0x7FFFFF",
+            "32768",
+            "8",
+            ">>",
+            "u16",
+            "u8"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "0x7FFFFF",
+            "32768"
+          ],
+          "val_misses": [],
+          "source_chunks": 12,
+          "chunk_files": [
+            "helloworld.c"
+          ],
+          "query_type": "How",
+          "answer_snippet": "## `recv_wav` Fonksiyonu — Maksimum Dosya Boyutu ve 16-bit → 8-bit Dönüşüm\n\n---\n\n### 1. Maksimum WAV Dosya Boyutu\n\n**Kaynak:** `helloworld.c`, satır 377-378\n\n```c\nconst u32 max_file_size = 0x7FFFFF; // 16.777 MB\nu8 *file = malloc(max_file_size);   // this will take most of the heap haha\n```\n\nİzin ve",
+          "ground_truth": "helloworld.c: max size=0x7FFFFF, formula: (u8)((u16)(wav_data[i]+32768)>>8)"
+        },
+        {
+          "id": "CA-04",
+          "category": "c_advanced",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.88,
+          "term_hits": [
+            "dma_mm2s_done",
+            "IOC",
+            "interrupt",
+            "1"
+          ],
+          "term_misses": [
+            "flag"
+          ],
+          "val_hits": [
+            "dma_mm2s_done",
+            "XAXIDMA_IRQ_IOC_MASK"
+          ],
+          "val_misses": [],
+          "source_chunks": 11,
+          "chunk_files": [
+            "design_1.tcl",
+            "helloworld.c"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## `dma_mm2s_isr` Interrupt Handler Analizi\n\n### Global Değişken: `dma_mm2s_done`\n\n`dma_mm2s_isr` fonksiyonu, **`dma_mm2s_done`** global değişkenini set eder.\n\n**Kaynak:** `helloworld.c` satır 33 ve 38-45:\n\n```c\nvolatile int dma_mm2s_done = 0;   // Global tanım (satır 33)\n\nvoid dma_mm2s_isr(void *ca",
+          "ground_truth": "helloworld.c: dma_mm2s_done = 1 when XAXIDMA_IRQ_IOC_MASK fires (IOC = Interrupt on Complete)"
+        },
+        {
+          "id": "CA-05",
+          "category": "c_advanced",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "XIntc",
+            "intc_inst",
+            "XIntc_Initialize",
+            "XIntc_Connect",
+            "XIntc_Start"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "XIntc",
+            "intc_inst"
+          ],
+          "val_misses": [],
+          "source_chunks": 11,
+          "chunk_files": [
+            "helloworld.c"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## Demo Struct ve XIntc Başlatma Analizi\n\n### 1. Demo Struct — XIntc intc_inst Alanı\n\n**Evet, `XIntc intc_inst` alanı `Demo` struct'ında mevcuttur.**\n\nKaynak dosyadan doğrudan alınan tanım (`helloworld.c`, satır 26-33):\n\n```c\ntypedef struct Demo {\n    XAxiDma   dma_inst;\n    XGpio     gpio_out_inst;",
+          "ground_truth": "helloworld.c: Demo struct has XIntc intc_inst; init() calls XIntc_Initialize→XIntc_Connect→XIntc_Start"
+        }
+      ]
+    },
+    {
+      "category": "xdc_pins",
+      "label": "XDC Pins   (PROJECT-B)",
+      "score": 1.0,
+      "grade": "A",
+      "n_questions": 5,
+      "questions": [
+        {
+          "id": "XP-01",
+          "category": "xdc_pins",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "E22",
+            "M17",
+            "LVCMOS12",
+            "switch"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "E22",
+            "M17",
+            "LVCMOS12"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "axi_gpio_wrapper.v",
+            "create_axi_simple_gpio.tcl",
+            "create_axi_simple.tcl",
+            "SYNTHESIS_RESULTS.md",
+            "create_axi_with_xdc.tcl",
+            "add_axi_gpio.tcl",
+            "Nexys-Video-Master.xdc",
+            "create_axi_auto.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## AXI GPIO Projesi — Switch Pin Atamaları\n\n### PACKAGE_PIN Atamaları\n\nKaynak dosyalardan (`create_axi_auto.tcl` satır 140-148, `create_axi_simple.tcl` satır 110-118) elde edilen bilgiler:\n\n| Port | PACKAGE_PIN | IOSTANDARD |\n|------|-------------|------------|\n| `switches_8bits_tri_i[0]` | **E22** ",
+          "ground_truth": "nexys_video.xdc / create_axi*.tcl: switches[0]=E22, switches[7]=M17, IOSTANDARD=LVCMOS12"
+        },
+        {
+          "id": "XP-02",
+          "category": "xdc_pins",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "U16",
+            "W15",
+            "LVCMOS25",
+            "led"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "U16",
+            "W15",
+            "LVCMOS25"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "axi_gpio_wrapper.v",
+            "create_axi_simple_gpio.tcl",
+            "create_axi_simple.tcl",
+            "SYNTHESIS_RESULTS.md",
+            "add_axi_gpio.tcl",
+            "Nexys-Video-Master.xdc",
+            "create_axi_auto.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## AXI GPIO LED Pin Atamaları\n\nKaynak dosyalardan elde edilen bilgilere göre:\n\n### `leds[3]` ve `leds[6]` Pin Atamaları\n\n| Port | PACKAGE_PIN | IOSTANDARD |\n|------|-------------|------------|\n| `leds[3]` | **U16** | **LVCMOS25** |\n| `leds[6]` | **W15** | **LVCMOS25** |\n\n### Tüm 8-bit LED Pin Tablos",
+          "ground_truth": "nexys_video.xdc / create_axi*.tcl: leds[3]=U16, leds[6]=W15, IOSTANDARD=LVCMOS25"
+        },
+        {
+          "id": "XP-03",
+          "category": "xdc_pins",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "CFGBVS",
+            "VCCO",
+            "CONFIG_VOLTAGE",
+            "3.3"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "VCCO",
+            "3.3"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "Nexys-Video-Master.xdc"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## Nexys-Video-Master.xdc — CFGBVS ve CONFIG_VOLTAGE Değerleri\n\n### Tanımlı Değerler\n\nKaynak dosyadan (`data/code/digilent-xdc/Nexys-Video-Master.xdc`, satır 310-313):\n\n```tcl\nset_property CONFIG_VOLTAGE 3.3 [current_design]\nset_property CFGBVS VCCO [current_design]\n```\n\n| Özellik | Değer |\n|---|---",
+          "ground_truth": "Nexys-Video-Master.xdc: set_property CFGBVS VCCO, CONFIG_VOLTAGE 3.3"
+        },
+        {
+          "id": "XP-04",
+          "category": "xdc_pins",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "C_IS_DUAL",
+            "1",
+            "GPIO2",
+            "switch",
+            "input",
+            "dual"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "C_IS_DUAL",
+            "switches"
+          ],
+          "val_misses": [],
+          "source_chunks": 13,
+          "chunk_files": [
+            "create_axi_simple_gpio.tcl",
+            "create_axi_simple.tcl",
+            "create_axi_with_xdc.tcl",
+            "create_axi_auto.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "# `axi_gpio_0` Dual Channel Konfigürasyonu\n\n## Kısa Yanıt: Evet, Dual Channel Olarak Konfigüre Edilmiştir\n\n`create_axi_with_xdc.tcl` dosyasının **STEP 2** bölümünde (satır 23-121) `axi_gpio_0` IP'si açıkça çift kanallı olarak yapılandırılmıştır.\n\n---\n\n## TCL Konfigürasyon Kodu\n\n```tcl\ncreate_bd_cell",
+          "ground_truth": "create_axi_with_xdc.tcl: C_IS_DUAL=1, GPIO→LEDs(output), GPIO2→Switches(input)"
+        },
+        {
+          "id": "XP-05",
+          "category": "xdc_pins",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "G22",
+            "J16",
+            "switch",
+            "PACKAGE_PIN"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "G22",
+            "J16"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "axi_gpio_wrapper.v",
+            "create_axi_simple_gpio.tcl",
+            "create_axi_simple.tcl",
+            "add_axi_gpio.tcl",
+            "Nexys-Video-Master.xdc",
+            "create_axi_auto.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## `switches[3]` ve `switches[5]` Pin Atamaları\n\n`axi_example` projesinde switch pin atamaları aşağıdaki gibidir:\n\n| Port | PACKAGE_PIN | IOSTANDARD |\n|------|-------------|------------|\n| `switches[3]` | **G22** | LVCMOS12 |\n| `switches[5]` | **J16** | LVCMOS12 |\n\n### Kaynaklar\n\nBu atamalar birden ",
+          "ground_truth": "nexys_video.xdc: switches[3]=G22, switches[5]=J16, IOSTANDARD=LVCMOS12"
+        }
+      ]
+    },
+    {
+      "category": "cross_project",
+      "label": "Cross-Project (A ↔ B)",
+      "score": 0.776,
+      "grade": "B",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "CR-01",
+          "category": "cross_project",
+          "project": "BOTH",
+          "type": "real",
+          "score": 0.6,
+          "term_hits": [
+            "xc7a100t",
+            "100T",
+            "Artix",
+            "nexys"
+          ],
+          "term_misses": [
+            "xc7a200t",
+            "200T"
+          ],
+          "val_hits": [
+            "xc7a100tcsg324-1"
+          ],
+          "val_misses": [
+            "xc7a200tsbg484-1"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "SYNTHESIS_RESULTS.md",
+            "platform.c",
+            "Nexys-A7-100T-Master.xdc",
+            "design_1.tcl",
+            "platform.h"
+          ],
+          "query_type": "CrossRef",
+          "answer_snippet": "# Hedef FPGA Part Numaraları\n\n## PROJECT-A: Nexys-A7-100T-DMA-Audio\n\n**Hedef FPGA:** `xc7a100tcsg324-1` (Artix-7 100T)\n\nKaynak: `DMA-REQ-L2-001` (FPGA Part Kısıtı)\n\n> **Önemli Not:** TCL dosyasında (`design_1.tcl`) başlangıçta `xc7a50ticsg324-1L` (50T) yazılıydı — bu **ISSUE-A-001** olarak kayıt alt",
+          "ground_truth": "A: xc7a100tcsg324-1 (Nexys A7-100T), B: xc7a200tsbg484-1 (Nexys Video)"
+        },
+        {
+          "id": "CR-02",
+          "category": "cross_project",
+          "project": "BOTH",
+          "type": "real",
+          "score": 0.829,
+          "term_hits": [
+            "axi_dma",
+            "DMA",
+            "GPIO",
+            "audio",
+            "amaç"
+          ],
+          "term_misses": [
+            "yoktur",
+            "farklı"
+          ],
+          "val_hits": [
+            "axi_dma"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "platform.c",
+            "Nexys-A7-100T-Master.xdc",
+            "helloworld.c",
+            "design_1.tcl",
+            "platform.h"
+          ],
+          "query_type": "CrossRef",
+          "answer_snippet": "# AXI DMA IP Bloğu: İki Proje Karşılaştırması\n\n## 1. Nexys-A7-100T-DMA-Audio Projesinde AXI DMA\n\n**Evet, bu projede AXI DMA IP bloğu mevcuttur ve merkezi bir rol üstlenmektedir.**\n\nKaynak dosyalardan doğrudan kanıtlar:\n\n- `design_1.tcl` satır 661-742'de `axi_dma_0` bloğu açıkça bağlanmıştır:\n  ```\n ",
+          "ground_truth": "A: axi_dma_0 var (audio streaming), B: DMA yok (GPIO LED/switch kontrol)"
+        },
+        {
+          "id": "CR-03",
+          "category": "cross_project",
+          "project": "BOTH",
+          "type": "real",
+          "score": 0.9,
+          "term_hits": [
+            "NUM_OUT_CLKS",
+            "2",
+            "audio",
+            "24.576",
+            "clock"
+          ],
+          "term_misses": [
+            "fark"
+          ],
+          "val_hits": [
+            "2",
+            "24.576"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "create_minimal_microblaze.tcl",
+            "create_axi_simple.tcl",
+            "SYNTHESIS_RESULTS.md",
+            "add_axi_gpio.tcl",
+            "nexys_video.xdc",
+            "Nexys-Video-Master.xdc"
+          ],
+          "query_type": "How",
+          "answer_snippet": "## Yanıt\n\n### nexys_a7_dma_audio Projesi — clk_wiz_0 NUM_OUT_CLKS\n\nContext'teki kaynak dosyalarda `nexys_a7_dma_audio` projesine ait `clk_wiz_0` için `NUM_OUT_CLKS` parametresi **açıkça belirtilmemiştir**.\n\n> ⚠️ **KRİTİK KURAL 10 gereği:** Bu değeri context'teki kaynak dosyalardan literal olarak oku",
+          "ground_truth": "A: NUM_OUT_CLKS=2 (100MHz+24.576MHz audio), B: single output 100MHz clock"
+        }
+      ]
+    },
+    {
+      "category": "trap_v2",
+      "label": "Trap v2    (DB'de yok)",
+      "score": 0.5,
+      "grade": "C",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "TR2-01",
+          "category": "trap_v2",
+          "project": "PROJECT-A",
+          "type": "trap",
+          "score": 0.5,
+          "verdict": "PARTIAL (reddetti ama uydurma değer var)",
+          "hallucination_matches": [
+            "codec",
+            "codec"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "Nexys-A7-100T-Master.xdc",
+            "design_1.tcl",
+            "helloworld.c",
+            "platform.c"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## Nexys A7 DMA Audio Projesinde Ses Codec Kullanımı\n\n### Kısa Yanıt\n\nContext'te bu projede **herhangi bir harici ses codec chip'i (CS4344, CS5343 veya benzeri) kullanıldığına dair hiçbir bilgi bulunmamaktadır.**\n\n---\n\n### Projede Kullanılan Gerçek Ses Çıkış Yöntemi\n\nContext'teki kaynak dosyalar ve ",
+          "ground_truth": "Projede audio codec YOK — direkt PWM kullanılıyor (fifo2audpwm). CS4344/CS5343 hallucination."
+        },
+        {
+          "id": "TR2-02",
+          "category": "trap_v2",
+          "project": "PROJECT-A",
+          "type": "trap",
+          "score": 0.5,
+          "verdict": "PARTIAL (reddetti ama uydurma değer var)",
+          "hallucination_matches": [
+            "ethernet",
+            "ethernet",
+            "ethernet",
+            "ethernet",
+            "ethernet",
+            "phy",
+            "phy",
+            "phy",
+            "liteeth"
+          ],
+          "source_chunks": 12,
+          "chunk_files": [
+            "design_1.tcl",
+            "Nexys-A7-100T-Master.xdc"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## Ethernet PHY Bloğu Hakkında\n\nContext'teki kaynak dosyalar ve node bilgileri incelendiğinde, **Nexys-A7-100T-DMA-Audio projesinde herhangi bir Ethernet PHY bloğu (LiteEth, Xilinx Ethernet veya başka bir Ethernet IP'si) yapılandırılmamıştır.**\n\n### Mevcut design_1.tcl İçeriği\n\n`design_1.tcl` dosyas",
+          "ground_truth": "Projede Ethernet bloğu YOK — audio DMA projesi, network stack yok"
+        },
+        {
+          "id": "TR2-03",
+          "category": "trap_v2",
+          "project": "PROJECT-B",
+          "type": "trap",
+          "score": 0.5,
+          "verdict": "PARTIAL (reddetti ama uydurma değer var)",
+          "hallucination_matches": [
+            "freertos",
+            "freertos"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "create_axi_simple_gpio.tcl",
+            "create_axi_simple.tcl",
+            "SYNTHESIS_RESULTS.md",
+            "create_axi_with_xdc.tcl",
+            "add_axi_gpio.tcl",
+            "create_axi_auto.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## FreeRTOS Kullanımı Hakkında\n\nContext'teki kaynak dosyalar ve node'lar incelendiğinde, **`axi_example` projesinde FreeRTOS kullanıldığına dair hiçbir bilgi bulunmamaktadır.**\n\n### Tespit Edilen Bulgular\n\nContext'te MicroBlaze yazılım katmanı için yalnızca şu bilgiler mevcuttur:\n\n| Bileşen | Kaynak",
+          "ground_truth": "Projede FreeRTOS YOK — bare-metal uygulama (helloworld.c direkt çalışır)"
+        }
+      ]
+    }
+  ]
+}

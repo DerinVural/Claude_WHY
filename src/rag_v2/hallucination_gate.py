@@ -331,10 +331,20 @@ class HallucinationGate:
         node_ids = {n.get("node_id", "") for n in nodes}
 
         for u, v, eattrs in self.graph.get_contradictions():
-            if u in node_ids or v in node_ids:
-                warnings.append(
-                    f"[Layer6-Contradiction] Nodes '{u}' and '{v}' have a "
-                    f"CONTRADICTS edge — review before using both."
-                )
+            if u not in node_ids and v not in node_ids:
+                continue
+
+            # Only fire for DECISION-DECISION contradictions.
+            # COMPONENT contradictions are spurious (structural misclassification
+            # from CrossReferenceDetector Mode 1 running on similar IP blocks).
+            u_type = (self.graph.get_node(u) or {}).get("node_type", "")
+            v_type = (self.graph.get_node(v) or {}).get("node_type", "")
+            if u_type == "COMPONENT" or v_type == "COMPONENT":
+                continue
+
+            warnings.append(
+                f"[Layer6-Contradiction] Nodes '{u}' and '{v}' have a "
+                f"CONTRADICTS edge — review before using both."
+            )
 
         return warnings
