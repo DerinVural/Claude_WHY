@@ -1,0 +1,902 @@
+{
+  "timestamp": "2026-02-27T14:54:02.909480",
+  "version": "v3",
+  "total_score": 0.837,
+  "overall_grade": "A",
+  "elapsed_s": 402.3,
+  "n_questions": 27,
+  "categories": [
+    {
+      "category": "pdf_ref",
+      "label": "PDF Ref Manual (nexys-a7_rm.pdf)",
+      "score": 0.892,
+      "grade": "A",
+      "n_questions": 5,
+      "questions": [
+        {
+          "id": "PDF-01",
+          "category": "pdf_ref",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "LAN8720A",
+            "RMII",
+            "10/100",
+            "Ethernet",
+            "PHY"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "LAN8720A",
+            "RMII",
+            "10/100"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "4 Ethernet PHY",
+            "SMSC Ethernet PHY",
+            "PDF Tablo: Oscillator/Clock In",
+            "3 Memory",
+            "Ethernet"
+          ],
+          "query_type": "What",
+          "answer_snippet": "Nexys A7 kartındaki SMSC Ethernet PHY hakkında tüm bilgiler referans kılavuzundan alınmıştır:\n\n**Part Numarası:** LAN8720A (SMSC)\n\n**Arayüz:** RMII (Reduced Media Independent Interface)\n\n**Maksimum Hız:** 100 Mb/s (10/100 Mb/s destekli)\n\n**Ek Detaylar** (kaynak: `nexys-a7_rm.pdf`, sayfa 12-13):\n- Gü",
+          "ground_truth": "nexys-a7_rm.pdf s.12: SMSC LAN8720A, RMII interface, 10/100 Mb/s"
+        },
+        {
+          "id": "PDF-02",
+          "category": "pdf_ref",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "3000",
+            "3077",
+            "tCK",
+            "DDR2",
+            "ps"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "3000",
+            "3077"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "3 Memory",
+            "3.1 DDR2",
+            "PDF Tablo: DDR2 MIG Settings",
+            "PDF Tablo: Nexys A7 Variant Co",
+            "5 Oscillators/Clocks"
+          ],
+          "query_type": "How",
+          "answer_snippet": "Nexys A7 Reference Manual'a göre (nexys-a7_rm.pdf, sayfa 11, Bölüm 3.1):\n\n- **Maksimum clock period (tCK) sınırı:** `3000 ps` (667 Mbps veri hızına karşılık gelir)\n- **Önerilen (recommended) tCK değeri:** `3077 ps` (650 Mbps veri hızına karşılık gelir)\n\nÖnerilen değerin maksimumdan biraz daha yüksek",
+          "ground_truth": "nexys-a7_rm.pdf s.11 Tablo 3.1.1: max 3000ps, recommended 3077ps"
+        },
+        {
+          "id": "PDF-03",
+          "category": "pdf_ref",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.76,
+          "term_hits": [
+            "ADXL362",
+            "SPI",
+            "interrupt"
+          ],
+          "term_misses": [
+            "INT1",
+            "INT2"
+          ],
+          "val_hits": [
+            "ADXL362",
+            "SPI"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "13 Accelerometer",
+            "13.1 SPI Interface",
+            "Accelerometer",
+            "13.2 Interrupts",
+            "xlconcat_1"
+          ],
+          "query_type": "How",
+          "answer_snippet": "## İvmeölçer SPI Modu ve Kesme Sinyalleri\n\n### SPI Modu\n\nADXL362 ivmeölçer, **SPI Mode 0** kullanır:\n- **CPOL = 0**, **CPHA = 0**\n- Önerilen SPI saat frekansı: **1 MHz – 5 MHz**\n\nKaynak: `nexys-a7_rm.pdf:28` (Bölüm 13.1 SPI Interface)\n\n---\n\n### Kesme (Interrupt) Pin Sinyal Adları\n\nXDC kısıt dosyasın",
+          "ground_truth": "nexys-a7_rm.pdf s.27: ADXL362, SPI mode, INT1/INT2 interrupt pins"
+        },
+        {
+          "id": "PDF-04",
+          "category": "pdf_ref",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.7,
+          "term_hits": [
+            "ADT7420",
+            "I2C",
+            "MSB",
+            "LSB",
+            "13"
+          ],
+          "term_misses": [
+            "0x48"
+          ],
+          "val_hits": [
+            "ADT7420"
+          ],
+          "val_misses": [
+            "0x48"
+          ],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "Temperature Sensor",
+            "12 Temperature Sensor",
+            "12.3 Quick Start Operation",
+            "12.1 I2C Interface",
+            "13.1 SPI Interface"
+          ],
+          "query_type": "What",
+          "answer_snippet": "Nexys A7 kartındaki sıcaklık sensörü (Analog Devices **ADT7420**) hakkında context'teki bilgiler:\n\n**I2C Adresi:** `0x4B` (slave address)\n\nKaynak: `nexys-a7_rm.pdf:27` — Bölüm 12.1 I2C Interface\n\n**Sıcaklık Verisi Bit Genişliği:** 16 bit (iki 8-bit register çifti olarak tutulur)\n\n- İlk okunan byte: ",
+          "ground_truth": "nexys-a7_rm.pdf s.26: ADT7420, I2C addr 0x48, 13-bit MSB+LSB registers"
+        },
+        {
+          "id": "PDF-05",
+          "category": "pdf_ref",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "PDM",
+            "pulse density",
+            "mikrofon",
+            "clock",
+            "MHz"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "PDM"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "14.2 Microphone Digital Interf",
+            "5 Oscillators/Clocks",
+            "Clock signal",
+            "14 Microphone",
+            "write_mig_file_design_1_mig_7s"
+          ],
+          "query_type": "How",
+          "answer_snippet": "Nexys A7 kartındaki mikrofon **PDM (Pulse Density Modulation)** formatını kullanır.\n\n**Kaynak:** `nexys-a7_rm.pdf:28` (Bölüm 14: Microphone)\n> \"The digitized audio is output in the pulse density modulated (PDM) format.\"\n\nMikrofon (ADMP421 çipi) için gereken saat frekansı aralığı:\n\n- **Minimum:** 1 M",
+          "ground_truth": "nexys-a7_rm.pdf s.28: PDM (Pulse Density Modulation), clock 1-3.2 MHz"
+        }
+      ]
+    },
+    {
+      "category": "ip_config",
+      "label": "IP Config      (design_1.tcl, PROJECT-A)",
+      "score": 0.795,
+      "grade": "B",
+      "n_questions": 4,
+      "questions": [
+        {
+          "id": "IC-01",
+          "category": "ip_config",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "C_USE_ICACHE",
+            "C_USE_DCACHE",
+            "1",
+            "microblaze",
+            "cache"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "1"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "IP CONFIG: microblaze_0",
+            "microblaze_0",
+            "IP CONFIG: microblaze_0_axi_in",
+            "IP CONFIG: axi_dma_0",
+            "write_mig_file_design_1_mig_7s"
+          ],
+          "query_type": "What",
+          "answer_snippet": "`design_1.tcl` dosyasındaki `microblaze_0` IP konfigürasyonuna göre:\n\n**Cache Parametreleri** (`design_1.tcl`, satır 592-604):\n\n| Parametre | Değer |\n|-----------|-------|\n| `C_USE_ICACHE` | `1` |\n| `C_USE_DCACHE` | `1` |\n| `C_DCACHE_ADDR_TAG` | `14` |\n\n**Sonuç:** Hem instruction cache (I-cache) hem",
+          "ground_truth": "design_1.tcl: CONFIG.C_USE_ICACHE {1} CONFIG.C_USE_DCACHE {1}"
+        },
+        {
+          "id": "IC-02",
+          "category": "ip_config",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "NUM_SI",
+            "NUM_MI",
+            "axi_interconnect",
+            "1",
+            "5"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "1",
+            "5"
+          ],
+          "val_misses": [],
+          "source_chunks": 16,
+          "chunk_labels": [
+            "axi_interconnect_0",
+            "IP CONFIG: axi_interconnect_0",
+            "IP CONFIG: microblaze_0_axi_pe",
+            "microblaze_0_axi_periph",
+            "xlconcat_1"
+          ],
+          "query_type": "What",
+          "answer_snippet": "`design_1.tcl` dosyasındaki `axi_interconnect_0` IP konfigürasyonuna göre:\n\n- **NUM_SI** (Slave Interface sayısı): **4**\n- **NUM_MI** (Master Interface sayısı): **1**\n\nKaynak: `design_1.tcl:514-521` (COMP: `axi_interconnect_0`, `xilinx.com:ip:axi_interconnect:2.1`)\n\n```tcl\nset_property -dict [ list ",
+          "ground_truth": "design_1.tcl: axi_interconnect_0 NUM_SI=1 NUM_MI=5"
+        },
+        {
+          "id": "IC-03",
+          "category": "ip_config",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.3,
+          "term_hits": [
+            "AUD_SAMPLE_FREQ",
+            "tone_generator"
+          ],
+          "term_misses": [
+            "96000",
+            "audio"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "96000"
+          ],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "tone_generator_0",
+            "clk_wiz_0",
+            "fifo_generator_0",
+            "write_mig_file_design_1_mig_7s",
+            "write_mig_file_design_1_mig_7s"
+          ],
+          "query_type": "Trace",
+          "answer_snippet": "Context'teki `design_1.tcl:644-658 (tone_generator_0)` chunk'ına göre, `tone_generator_0` için yalnızca şu property açıkça set edilmiştir:\n\n```tcl\nset_property -dict [ list \\\n   CONFIG.AXIS_CLK_DOMAIN {/processing_system/clk_wiz_0_clk_out1} \\\n ] $tone_generator_0\n```\n\n**`AUD_SAMPLE_FREQ` parametresi",
+          "ground_truth": "tone_generator.v: AUD_SAMPLE_FREQ=96000 Hz"
+        },
+        {
+          "id": "IC-04",
+          "category": "ip_config",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.88,
+          "term_hits": [
+            "xlconcat",
+            "NUM_PORTS",
+            "concat",
+            "2"
+          ],
+          "term_misses": [
+            "interrupt"
+          ],
+          "val_hits": [
+            "2"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "IP CONFIG: xlconcat_1",
+            "xlconcat_0",
+            "IP CONFIG: microblaze_0_xlconc",
+            "microblaze_0_xlconcat",
+            "xlconcat_1"
+          ],
+          "query_type": "Why",
+          "answer_snippet": "## `xlconcat_1` IP Bilgileri\n\n### NUM_PORTS Değeri\n\n**NUM_PORTS = 3**\n\nBu değer iki ayrı context kaynağından doğrulanmaktadır:\n\n1. **IP CONFIG chunk** (`design_1.tcl:0-0`, `IP CONFIG: xlconcat_1`):\n   ```\n   NUM_PORTS = 3\n   ```\n\n2. **TCL instance kodu** (`design_1.tcl:661-742`, `xlconcat_1`):\n   ``",
+          "ground_truth": "design_1.tcl: xlconcat_1 NUM_PORTS=2, interrupt concatenation for MicroBlaze INTC"
+        }
+      ]
+    },
+    {
+      "category": "rtl_signal",
+      "label": "RTL Signal     (tone_gen/axis2fifo)",
+      "score": 1.0,
+      "grade": "A",
+      "n_questions": 4,
+      "questions": [
+        {
+          "id": "RTL-01",
+          "category": "rtl_signal",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "TONE_FREQ",
+            "261",
+            "Hz",
+            "tone_generator"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "261"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "Verilog Params: tone_generator",
+            "tone_generator",
+            "tone_generator_0",
+            "dma_sw_tone_gen",
+            "switch"
+          ],
+          "query_type": "What",
+          "answer_snippet": "`tone_generator.v` dosyasından:\n\n```verilog\nparameter TONE_FREQ = 261\n```\n\n**Varsayılan değer: 261 Hz**\n\nBu frekans, piyano klavyesinde **orta Do (Middle C / C4)** notasına karşılık gelir. (Standart akort: 261.63 Hz ≈ 261 Hz)\n\nBunu doğrulayan kaynak koddan ek kanıtlar:\n\n- `helloworld.c:459` — `xil_p",
+          "ground_truth": "tone_generator.v: TONE_FREQ=261 Hz (Middle C / Do notası)"
+        },
+        {
+          "id": "RTL-02",
+          "category": "rtl_signal",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "PACKET_SIZE",
+            "256",
+            "ACCUMULATOR_DEPTH",
+            "32"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "256",
+            "32"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "Verilog Params: tone_generator",
+            "tone_generator",
+            "clk_wiz_0",
+            "dma_forward",
+            "axi_dma_0"
+          ],
+          "query_type": "What",
+          "answer_snippet": "`tone_generator.v` dosyasından (`data/code/Nexys-A7-100T-DMA-Audio/src/hdl/tone_generator.v`):\n\n## Parametre Değerleri\n\n| Parametre | Tür | Değer |\n|---|---|---|\n| `PACKET_SIZE` | `parameter` | **256** |\n| `PACKET_SIZE_CLOG2` | `parameter` | **8** |\n| `ACCUMULATOR_DEPTH` | `localparam` | **32** |\n| ",
+          "ground_truth": "tone_generator.v: PACKET_SIZE=256, ACCUMULATOR_DEPTH=32"
+        },
+        {
+          "id": "RTL-03",
+          "category": "rtl_signal",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "axis_tvalid",
+            "axis_tready",
+            "fifo_wr_en",
+            "fifo_full",
+            "and"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "axis_tvalid",
+            "axis_tready"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "axis2fifo",
+            "Verilog Params: axis2fifo",
+            "CLIFirst Metodoloji",
+            "xlconcat_1",
+            "fifo2audpwm"
+          ],
+          "query_type": "What",
+          "answer_snippet": "## `axis2fifo.v` — FIFO Yazma Koşulu\n\nKaynak: `data/code/Nexys-A7-100T-DMA-Audio/src/hdl/axis2fifo.v:34-35`\n\n```verilog\nassign axis_tready = ~fifo_full;\nassign fifo_wr_en  = axis_tready & axis_tvalid;\n```\n\n### Koşul Zinciri\n\n| Sinyal | Değer | Açıklama |\n|---|---|---|\n| `axis_tready` | `~fifo_full` ",
+          "ground_truth": "axis2fifo.v: fifo_wr_en = axis_tvalid & axis_tready & ~fifo_full"
+        },
+        {
+          "id": "RTL-04",
+          "category": "rtl_signal",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "axis_tlast",
+            "packet_count",
+            "PACKET_SIZE",
+            "255"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "packet_count",
+            "PACKET_SIZE"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "tone_generator",
+            "Verilog Params: tone_generator",
+            "clk_wiz_0",
+            "xlconcat_1",
+            "IP CONFIG: clk_wiz_0"
+          ],
+          "query_type": "How",
+          "answer_snippet": "`axis_tlast` sinyali `tone_generator.v` içinde aşağıdaki şekilde üretilmektedir:\n\n**Kaynak:** `tone_generator.v:60-68`\n\n```verilog\nreg [$clog2(PACKET_SIZE)-1:0] packet_count = 0;\n\nalways@(posedge clk)\n    if (axis_tvalid & axis_tready) begin\n        if (packet_count >= PACKET_SIZE)\n            packe",
+          "ground_truth": "tone_generator.v: axis_tlast = (packet_count == PACKET_SIZE-1) yani 255"
+        }
+      ]
+    },
+    {
+      "category": "c_code",
+      "label": "C Code         (helloworld.c)",
+      "score": 0.883,
+      "grade": "A",
+      "n_questions": 4,
+      "questions": [
+        {
+          "id": "CC-01",
+          "category": "c_code",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.85,
+          "term_hits": [
+            "ddr_buf",
+            "DDR_AUDIO_LENGTH",
+            "buffer"
+          ],
+          "term_misses": [
+            "u8"
+          ],
+          "val_hits": [
+            "ddr_buf",
+            "DDR_AUDIO_LENGTH"
+          ],
+          "val_misses": [],
+          "source_chunks": 16,
+          "chunk_labels": [
+            "includes_defines",
+            "global_vars",
+            "declarations_after_line_294",
+            "C Tanımlar: helloworld.c",
+            "dma_forward"
+          ],
+          "query_type": "What",
+          "answer_snippet": "Context'te sağlanan `helloworld.c` kaynak koduna göre:\n\n**`Demo` struct'ının alanları** (PARAMS chunk'ından):\n```\nstruct Demo:\n  XAxiDma dma_inst\n  XGpio gpio_out_inst\n  XGpio gpio_in_inst\n  XUartLite uart_inst\n  XIntc intc_inst\n  DemoMode mode\n```\n\nBu struct'ta `ddr_buf` adında bir alan **bulunmuyo",
+          "ground_truth": "helloworld.c: Demo struct has u8 *ddr_buf, DDR_AUDIO_LENGTH define"
+        },
+        {
+          "id": "CC-02",
+          "category": "c_code",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.88,
+          "term_hits": [
+            "XST_FAILURE",
+            "reset",
+            "timeout",
+            "ERROR"
+          ],
+          "term_misses": [
+            "XAxiDma_Initialize"
+          ],
+          "val_hits": [
+            "XST_FAILURE"
+          ],
+          "val_misses": [],
+          "source_chunks": 12,
+          "chunk_labels": [
+            "includes_defines",
+            "global_vars",
+            "declarations_after_line_228",
+            "declarations_after_line_214",
+            "declarations_after_line_183"
+          ],
+          "query_type": "What",
+          "answer_snippet": "`helloworld.c:56-103` (`init_dma` fonksiyonu) kaynak koduna göre:\n\n**1. `XAxiDma_CfgInitialize` başarısız olursa:**\n```c\n// helloworld.c:73-77\nstatus = XAxiDma_CfgInitialize(p_dma_inst, cfg_ptr);\nif (status != XST_SUCCESS)\n{\n    xil_printf(\"ERROR! Initialization of AXI DMA failed with %d\\r\\n\", statu",
+          "ground_truth": "helloworld.c: returns XST_FAILURE on init error or DMA reset timeout"
+        },
+        {
+          "id": "CC-03",
+          "category": "c_code",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "TONE_FREQ",
+            "sw_tone_gen",
+            "sin",
+            "261",
+            "tone"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "TONE_FREQ",
+            "261"
+          ],
+          "val_misses": [],
+          "source_chunks": 11,
+          "chunk_labels": [
+            "includes_defines",
+            "global_vars",
+            "switch",
+            "dma_sw_tone_gen",
+            "C Tanımlar: helloworld.c"
+          ],
+          "query_type": "What",
+          "answer_snippet": "`dma_sw_tone_gen` fonksiyonu **261 Hz** frekansta sinyal üretir.\n\n## Frekans Hesabı\n\n**Kaynak:** `helloworld.c:280-308 (dma_sw_tone_gen)`\n\n```c\naccum += 0x00B22D0E;\n((u8*)buffer)[i] = accum >> 24;\n```\n\nKullanılan sabit değer: **`0x00B22D0E`** (ondalık: 11,677,966)\n\nBu değer, DDS (Direct Digital Synt",
+          "ground_truth": "helloworld.c: sw_tone_gen uses TONE_FREQ=261 Hz, sinüs tablosu ile"
+        },
+        {
+          "id": "CC-04",
+          "category": "c_code",
+          "project": "PROJECT-A",
+          "type": "real",
+          "score": 0.8,
+          "term_hits": [
+            "mode",
+            "SW_TONE_GEN",
+            "HW_TONE_GEN",
+            "RECV"
+          ],
+          "term_misses": [
+            "button_pe",
+            "buton"
+          ],
+          "val_hits": [
+            "SW_TONE_GEN",
+            "HW_TONE_GEN"
+          ],
+          "val_misses": [],
+          "source_chunks": 14,
+          "chunk_labels": [
+            "includes_defines",
+            "global_vars",
+            "uart_recv",
+            "typedef struct Demo",
+            "declarations_after_line_97"
+          ],
+          "query_type": "What",
+          "answer_snippet": "Context'teki `helloworld.c` parçaları, **DemoMode** enum'unu ve `uart_recv` fonksiyonunu içermektedir:\n\n**Tanımlı Modlar** (`helloworld.c:18-23`, `typedef enum DemoMode`):\n\n| Enum Değeri | Anlamı |\n|---|---|\n| `DEMO_MODE_PAUSED` (0) | Duraklatılmış |\n| `DEMO_MODE_HW_TONE_GEN` | Donanım ton üretimi |",
+          "ground_truth": "helloworld.c: button_pe() fonksiyonu, SW_TONE_GEN/HW_TONE_GEN/RECV_WAV/PLAY_WAV modları"
+        }
+      ]
+    },
+    {
+      "category": "xdc_detail",
+      "label": "XDC Detail     (PROJECT-B)",
+      "score": 0.832,
+      "grade": "A",
+      "n_questions": 4,
+      "questions": [
+        {
+          "id": "XD-01",
+          "category": "xdc_detail",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 0.68,
+          "term_hits": [
+            "T14",
+            "leds",
+            "PACKAGE_PIN",
+            "LED"
+          ],
+          "term_misses": [
+            "V16"
+          ],
+          "val_hits": [
+            "T14"
+          ],
+          "val_misses": [
+            "V16"
+          ],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "lines 103-139",
+            "ADIM 10 XDCyi güncelle LED pin",
+            "lines 137-173",
+            "Kritik Bağlantılar",
+            "ADIM 7 GPIO harici port oluştu"
+          ],
+          "query_type": "What",
+          "answer_snippet": "Context'teki kaynak dosyalara göre:\n\n**`validation_test/axi_example/add_axi_gpio.tcl` (satır 89-118):**\n\n- `leds[0]` → `PACKAGE_PIN T14`, `IOSTANDARD LVCMOS25`\n- `leds[7]` → `PACKAGE_PIN Y13`, `IOSTANDARD LVCMOS25`\n\nKaynak: `add_axi_gpio.tcl:98` ve `add_axi_gpio.tcl:105`",
+          "ground_truth": "nexys_video.xdc: leds[0]=T14, leds[7]=V16, IOSTANDARD=LVCMOS25"
+        },
+        {
+          "id": "XD-02",
+          "category": "xdc_detail",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 0.9,
+          "term_hits": [
+            "create_clock",
+            "10.000",
+            "100",
+            "MHz",
+            "R4"
+          ],
+          "term_misses": [
+            "sys_clk"
+          ],
+          "val_hits": [
+            "10.000",
+            "R4"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "Kritik Bağlantılar",
+            "lines 35-71",
+            " Sonuç",
+            "ADIM 6 Bağlantıları yap",
+            "STEP 3 Connections (part 1)"
+          ],
+          "query_type": "What",
+          "answer_snippet": "`validation_test/axi_example/create_axi_simple.tcl` (satır 69-105) içindeki XDC içeriğine göre:\n\n```tcl\nset_property -dict { PACKAGE_PIN R4 IOSTANDARD LVCMOS33 } [get_ports sys_clock]\ncreate_clock -period 10.000 -name sys_clock_pin -waveform {0.000 5.000} -add [get_ports sys_clock]\n```\n\n- **Periyot:",
+          "ground_truth": "nexys_video.xdc: create_clock -period 10.000 -name sys_clk [get_ports sys_clk], pin R4"
+        },
+        {
+          "id": "XD-03",
+          "category": "xdc_detail",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 0.747,
+          "term_hits": [
+            "G21",
+            "LVCMOS12",
+            "switch",
+            "PACKAGE_PIN"
+          ],
+          "term_misses": [
+            "F22"
+          ],
+          "val_hits": [
+            "G21",
+            "LVCMOS12"
+          ],
+          "val_misses": [
+            "F22"
+          ],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "lines 137-173",
+            "lines 103-139",
+            "lines 103-133",
+            "GPIO_IN",
+            "lines 35-71"
+          ],
+          "query_type": "What",
+          "answer_snippet": "Context'teki TCL kaynak dosyalarından doğrudan alınan değerler:\n\n**`switches_8bits_tri_i[1]`**\n- `PACKAGE_PIN`: **F21**\n- `IOSTANDARD`: **LVCMOS12**\n\n**`switches_8bits_tri_i[2]`**\n- `PACKAGE_PIN`: **G21**\n- `IOSTANDARD`: **LVCMOS12**\n\n**Kaynak:** `validation_test/axi_example/create_axi_auto.tcl` (sa",
+          "ground_truth": "nexys_video.xdc: switches[1]=F22, switches[2]=G21, IOSTANDARD=LVCMOS12"
+        },
+        {
+          "id": "XD-04",
+          "category": "xdc_detail",
+          "project": "PROJECT-B",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "C_GPIO_WIDTH",
+            "8",
+            "GPIO",
+            "GPIO2",
+            "switch"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "8"
+          ],
+          "val_misses": [],
+          "source_chunks": 15,
+          "chunk_labels": [
+            "STEP 2 Block Design Creation (",
+            "STEP 6 XDC Constraints Nexys V",
+            "STEP 3 Connections (part 2)",
+            "STEP 6 XDC Constraints Nexys V",
+            "STEP 3 Connections (part 1)"
+          ],
+          "query_type": "How",
+          "answer_snippet": "`create_axi_with_xdc.tcl` dosyasındaki `axi_gpio_0` konfigürasyonundan (satır 23-121):\n\n- **C_GPIO_WIDTH** (GPIO1, LED çıkış): **8** bit\n- **C_GPIO2_WIDTH** (GPIO2, switch girişi): **8** bit\n\nKaynak (`create_axi_with_xdc.tcl:30-38`):\n```tcl\nset_property -dict [list \\\n    CONFIG.C_GPIO_WIDTH {8} \\\n  ",
+          "ground_truth": "create_axi_with_xdc.tcl: C_GPIO_WIDTH=8 (8-bit LED output, 8-bit switch input)"
+        }
+      ]
+    },
+    {
+      "category": "cross_project",
+      "label": "Cross-Project  (A ↔ B)",
+      "score": 0.82,
+      "grade": "A",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "CR-01",
+          "category": "cross_project",
+          "project": "BOTH",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "230400",
+            "baud",
+            "C_BAUDRATE",
+            "uartlite",
+            "fark"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "230400"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "IP CONFIG: axi_uartlite_0",
+            "axi_uartlite_0",
+            "xlconcat_1",
+            "USBRS232 Interface",
+            "includes_defines_typedefs"
+          ],
+          "query_type": "CrossRef",
+          "answer_snippet": "## UART Konfigürasyon Karşılaştırması\n\n### PROJECT-A (nexys_a7_dma_audio) — AXI UARTLite Baud Rate\n\n**Baud rate: 230400**\n\n`design_1.tcl` satır 521-528'den alınan gerçek IP konfigürasyonu:\n```tcl\nset_property -dict [ list \\\n   CONFIG.C_BAUDRATE {230400} \\\n   CONFIG.UARTLITE_BOARD_INTERFACE {usb_uart",
+          "ground_truth": "A: axi_uartlite_0 C_BAUDRATE=230400, B: axi_uartlite farklı veya yok"
+        },
+        {
+          "id": "CR-02",
+          "category": "cross_project",
+          "project": "BOTH",
+          "type": "real",
+          "score": 0.9,
+          "term_hits": [
+            "mig_7series",
+            "DDR2",
+            "GPIO",
+            "bellek",
+            "yok"
+          ],
+          "term_misses": [
+            "128MB"
+          ],
+          "val_hits": [
+            "mig_7series",
+            "DDR2"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "write_mig_file_design_1_mig_7s",
+            "IP CONFIG: mig_7series_0",
+            "IP CONFIG: fifo_generator_0",
+            "mig_7series_0",
+            "write_mig_file_design_1_mig_7s"
+          ],
+          "query_type": "CrossRef",
+          "answer_snippet": "## Bellek Mimarisi Karşılaştırması\n\n### PROJECT-A: nexys_a7_dma_audio — MIG 7-Series DDR2 VAR\n\nEvet, bu projede MIG 7-Series DDR2 IP bloğu mevcuttur:\n\n**COMP-A-mig_7series_0** (kaynak: `design_1.tcl:625-641`)\n\n| Parametre | Değer |\n|---|---|\n| IP | `xilinx.com:ip:mig_7series:4.1` |\n| Kapasite | 128 ",
+          "ground_truth": "A: mig_7series_0 DDR2 128MB var, B: DDR yok (sadece BRAM/MicroBlaze local memory)"
+        },
+        {
+          "id": "CR-03",
+          "category": "cross_project",
+          "project": "BOTH",
+          "type": "real",
+          "score": 0.56,
+          "term_hits": [
+            "ext_reset_in",
+            "reset",
+            "clk_wiz"
+          ],
+          "term_misses": [
+            "proc_sys_reset",
+            "dcm_locked"
+          ],
+          "val_hits": [
+            "ext_reset_in"
+          ],
+          "val_misses": [
+            "proc_sys_reset"
+          ],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "xlconcat_1",
+            "xlconcat_1",
+            "C Tanımlar: helloworld.c",
+            "IP CONFIG: fifo_generator_0",
+            "xlconcat_1"
+          ],
+          "query_type": "How",
+          "answer_snippet": "## nexys_a7_dma_audio — `rst_mig_7series_0_81M/ext_reset_in`\n\nContext'teki TCL dosyasına göre (`design_1.tcl:661-742`):\n\n```tcl\nconnect_bd_net -net mig_7series_0_ui_clk_sync_rst\n  [get_bd_pins mig_7series_0/ui_clk_sync_rst]\n  [get_bd_pins rst_mig_7series_0_81M/ext_reset_in]\n  ...\n```\n\n`rst_mig_7seri",
+          "ground_truth": "A: proc_sys_reset ext_reset_in→reset_btn, dcm_locked→dcm_locked; B: farklı reset yapısı"
+        }
+      ]
+    },
+    {
+      "category": "trap_v3",
+      "label": "Trap v3        (DB'de yok)",
+      "score": 0.5,
+      "grade": "C",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "TR3-01",
+          "category": "trap_v3",
+          "project": "PROJECT-A",
+          "type": "trap",
+          "score": 0.5,
+          "verdict": "PARTIAL (reddetti ama uydurma var)",
+          "hallucination_matches": [
+            "video",
+            "video"
+          ],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "HDMI out",
+            "HDMI in",
+            "15 Mono Audio Output",
+            "Audio Codec",
+            "Display Port"
+          ],
+          "query_type": "What",
+          "answer_snippet": "**Hayır — `nexys_a7_dma_audio` projesinde HDMI çıkışı IP bloğu (DVI/HDMI transmitter) bulunmamaktadır.**\n\n## Sebep\n\nContext'teki tüm gereksinim node'ları (DMA-REQ-L0-001 … DMA-REQ-L2-010) bu projenin yalnızca **ses akışı** üzerine kurulu olduğunu gösteriyor:\n\n| Node | İçerik |\n|---|---|\n| DMA-REQ-L0",
+          "ground_truth": "Projede HDMI/DVI YOK — ses DMA projesi, video çıkışı yok"
+        },
+        {
+          "id": "TR3-02",
+          "category": "trap_v3",
+          "project": "PROJECT-B",
+          "type": "trap",
+          "score": 0.5,
+          "verdict": "PARTIAL (reddetti ama uydurma var)",
+          "hallucination_matches": [
+            "u-boot",
+            "u-boot",
+            "fsbl",
+            "fsbl",
+            "boot loader",
+            "quad-spi",
+            "quad-spi",
+            "flash",
+            "axi_quad_spi"
+          ],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "PDF Tablo: SPI Flash Pin-out",
+            "3.2 Quad-SPI Flash",
+            "Kritik Bağlantılar",
+            "section_0",
+            "STEP 3 Connections (part 2)"
+          ],
+          "query_type": "What",
+          "answer_snippet": "Context'te axi_gpio_example projesi için **boot loader (FSBL / u-boot) veya Quad-SPI controller konfigürasyonu** hakkında herhangi bir bilgi bulunamamıştır.\n\nContext'te yalnızca şunlar mevcut:\n\n- **Donanım düzeyi** (nexys-a7_rm.pdf, sayfa 12): Nexys A7 kartında Spansion S25FL128S Quad-SPI Flash bulu",
+          "ground_truth": "Projede boot loader/FSBL konfigürasyonu YOK — saf GPIO örneği"
+        },
+        {
+          "id": "TR3-03",
+          "category": "trap_v3",
+          "project": "PROJECT-A",
+          "type": "trap",
+          "score": 0.5,
+          "verdict": "PARTIAL (reddetti ama uydurma var)",
+          "hallucination_matches": [
+            "hid",
+            "hid"
+          ],
+          "source_chunks": 10,
+          "chunk_labels": [
+            "USBRS232 Interface",
+            "IP CONFIG: axi_uartlite_0",
+            "USB HID PS2",
+            "axi_uartlite_0",
+            "6 USB-UART Bridge (Serial Port"
+          ],
+          "query_type": "What",
+          "answer_snippet": "`nexys_a7_dma_audio` projesinde **USB OTG veya USB 3.0 kontrolcüsü bulunmamaktadır.**\n\nContext'teki kaynak dosya ve PDF referans kılavuzuna göre bu projede iki farklı USB işlevi mevcuttur, ancak bunların hiçbiri OTG veya USB 3.0 değildir:\n\n---\n\n## Mevcut USB Arayüzleri\n\n### 1. USB-UART Köprüsü (FT22",
+          "ground_truth": "Projede USB kontrolcüsü YOK — sadece UART-USB köprü (FT2232) var, IP bloğu değil"
+        }
+      ]
+    }
+  ]
+}

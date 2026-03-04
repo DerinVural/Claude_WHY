@@ -20,11 +20,12 @@ class SentenceEmbeddings:
         """Lazy load the embedding model."""
         if self._model is None:
             try:
-                import torch
+                import os
                 from sentence_transformers import SentenceTransformer
-                device = "cuda" if torch.cuda.is_available() else "cpu"
-                self._model = SentenceTransformer(self.model_name, device=device)
-                print(f"    [OK] Sentence Transformer modeli yüklendi: {self.model_name} ({device})")
+                # Force CPU: CUDA 12.1 exceeds PyTorch max (12.0) and causes hangs
+                os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+                self._model = SentenceTransformer(self.model_name, device="cpu")
+                print(f"    [OK] Sentence Transformer modeli yüklendi: {self.model_name} (cpu)")
             except Exception as e:
                 raise RuntimeError(f"Sentence Transformers başlatılamadı: {e}")
         return self._model

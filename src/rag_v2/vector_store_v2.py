@@ -9,7 +9,7 @@ Config:
   DB path     : db/chroma_graph_nodes/   (isolated from chroma_db/)
   Collection  : fpga_rag_v2_nodes
   Metric      : cosine
-  Embedding   : all-mpnet-base-v2, 768-dim (consistent with production DB)
+  Embedding   : paraphrase-multilingual-mpnet-base-v2, 768-dim (multilingual)
   Ext embed   : embedding_function=None (embeddings computed externally)
   Threshold   : 0.35 (default — cosine similarity, lowered for technical doc robustness)
 """
@@ -37,10 +37,12 @@ def _get_embedder():
             sys.path.insert(0, src_path)
         try:
             from rag.sentence_embeddings import SentenceEmbeddings
-            _embedder = SentenceEmbeddings(model_name="all-mpnet-base-v2")
+            _embedder = SentenceEmbeddings(model_name="paraphrase-multilingual-mpnet-base-v2")
         except ImportError:
+            import os
             from sentence_transformers import SentenceTransformer
-            _model = SentenceTransformer("all-mpnet-base-v2")
+            os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+            _model = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2", device="cpu")
             class _Wrapper:
                 def embed_text(self, text):
                     return _model.encode(text).tolist()
@@ -59,16 +61,19 @@ def build_node_text(node: Dict[str, Any]) -> str:
     Architecture §3 Phase 6: embed node text.
     Format: "{node_type} {name} {description} {key_logic} {acceptance_criteria}"
     """
+    def _s(v):
+        if isinstance(v, list): return " ".join(str(x) for x in v)
+        return str(v) if v else ""
+
     parts = [
-        node.get("node_type", ""),
-        node.get("node_id", ""),          # node_id her zaman dahil (clk_wiz_0 gibi isimler)
-        node.get("name", ""),
-        node.get("description", ""),
-        node.get("key_logic", ""),
-        node.get("acceptance_criteria", ""),
-        # Extra fields for richer retrieval
-        node.get("rationale", ""),
-        node.get("summary", ""),
+        _s(node.get("node_type", "")),
+        _s(node.get("node_id", "")),
+        _s(node.get("name", "")),
+        _s(node.get("description", "")),
+        _s(node.get("key_logic", "")),
+        _s(node.get("acceptance_criteria", "")),
+        _s(node.get("rationale", "")),
+        _s(node.get("summary", "")),
     ]
     return " ".join(p for p in parts if p).strip()
 

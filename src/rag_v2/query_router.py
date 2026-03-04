@@ -123,7 +123,9 @@ _CLASSIFY_PATTERNS = [
     # "her iki proje" / "project a ve b" / "iki proje için" → CROSSREF (no project filter)
     (r'(karşılaştır|versus|\bvs\b|analogous|contradicts|çelişki|iki proje|karşılaştırma'
      r'|her iki proje|her iki\s+(?:proje|sistem|tasarım)'
-     r'|project.a.ve.project.b|proje.a.ve.b|a\s+ve\s+b\s+(?:projesi|için|proje)'
+     r'|project.a.ve.project.b|project\s+a\s+ve\s+b|proje.a.ve.b|a\s+ve\s+b\s+(?:projesi|için|proje)'
+     r'|mevcut projeler\w*|sistemdeki projeler\w*'
+     r'|projelerimiz\w*|projeleriniz\w*|tüm projeler\w*|bu projeler\w*'
      r'|(?:iki\s+\w+\s+arasındaki)'
      r'|\barasındaki\s+(?:fark|benzerlik|farklılık|ilişki|uyum|çelişki|karşılaştırma)'
      r'|(?:fark\w*|benzer\w*|farklı\w*|alternatif\w*)\s+\w{0,10}\s+arasında)', QueryType.CROSSREF),
@@ -276,8 +278,8 @@ class QueryRouter:
                         if nbr_node and nbr_id not in self._stale_ids:
                             graph_nodes.append({"node_id": nbr_id, **nbr_node})
 
-        project_filter = self._resolve_project(question, vector_hits)
-        source_chunks = self._search_source_chunks(question, project_filter=project_filter)
+        project = self._resolve_project(question, vector_hits)
+        source_chunks = self._search_source_chunks(question, project_filter=project)
 
         return QueryResult(
             query=question,
@@ -316,11 +318,8 @@ class QueryRouter:
             for nbr_id, eattrs in self.graph.get_neighbors(nid, edge_type="DEPENDS_ON"):
                 pattern_edges.append({"from": nid, "to": nbr_id, **eattrs})
 
-        # How sorguları genellikle RTL/implementation detayı arar
-        project_filter = self._resolve_project(question, vector_hits)
-        source_chunks = self._search_source_chunks(
-            question, project_filter=project_filter, file_type_filter=None
-        )
+        project = self._resolve_project(question, vector_hits)
+        source_chunks = self._search_source_chunks(question, project_filter=project)
 
         return QueryResult(
             query=question,
@@ -366,8 +365,8 @@ class QueryRouter:
             if ev_node and ev_node.get("node_type") in ("EVIDENCE", "REQUIREMENT"):
                 evidence_nodes.append({"node_id": edge["to"], **ev_node})
 
-        project_filter = self._resolve_project(question, vector_hits)
-        source_chunks = self._search_source_chunks(question, project_filter=project_filter)
+        project = self._resolve_project(question, vector_hits)
+        source_chunks = self._search_source_chunks(question, project_filter=project)
 
         return QueryResult(
             query=question,
@@ -444,8 +443,8 @@ class QueryRouter:
         # Req tree for any requirements in scope
         req_tree = self._get_req_trees_for_nodes(list(visited_nodes.values()))
 
-        project_filter = self._resolve_project(question, vector_hits)
-        source_chunks = self._search_source_chunks(question, project_filter=project_filter)
+        project = self._resolve_project(question, vector_hits)
+        source_chunks = self._search_source_chunks(question, project_filter=project)
 
         return QueryResult(
             query=question,
@@ -530,8 +529,8 @@ class QueryRouter:
                                 if node_data:
                                     visited_nodes[nid] = {"node_id": nid, **node_data}
 
-        # CrossRef: iki proje karşılaştırması → her iki projeden de chunk ara
-        source_chunks = self._search_source_chunks(question)
+        # CrossRef: her zaman global arama — karşılaştırma sorguları çok proje gerektirir
+        source_chunks = self._search_source_chunks(question, project_filter=None)
 
         return QueryResult(
             query=question,
@@ -547,99 +546,146 @@ class QueryRouter:
     # Source chunk helper — 4th store
     # ------------------------------------------------------------------
 
-    # Question-text keywords that strongly indicate a specific project.
-    # PROJECT-A = nexys_a7_dma_audio | PROJECT-B = axi_gpio_example (Nexys Video)
+    # Question-text keywords → specific project name (real dir name)
+    # None döndüren sorular global arama yapar (filtre yok)
     _TEXT_PROJECT_SIGNALS: List[tuple] = [
-        # PROJECT-B (axi_gpio_example / Nexys Video)
-        ("nexys video", "PROJECT-B"),
-        ("axi_gpio_example", "PROJECT-B"),
-        ("axi_gpio_wrapper", "PROJECT-B"),  # unique RTL file for PROJECT-B
-        ("lvcmos25", "PROJECT-B"),          # Nexys Video LED IOSTANDARD
-        ("lvcmos12", "PROJECT-B"),          # Nexys Video switch IOSTANDARD
-        # NOT: microblaze ve mdm_1 her iki projede de var — proje sinyali değil
-        ("synthesis_results", "PROJECT-B"),
-        ("synthesis results", "PROJECT-B"),
-        # PROJECT-A (nexys_a7_dma_audio)
-        ("nexys a7", "PROJECT-A"),
-        ("nexys-a7", "PROJECT-A"),
-        ("dma audio", "PROJECT-A"),
-        ("dma ses", "PROJECT-A"),
-        ("axis2fifo", "PROJECT-A"),
-        ("fifo2audpwm", "PROJECT-A"),
-        ("tone_generator", "PROJECT-A"),
-        ("helloworld", "PROJECT-A"),
-        ("pwm audio", "PROJECT-A"),
-        ("aud_pwm", "PROJECT-A"),
-        ("s2mm", "PROJECT-A"),
-        ("mm2s", "PROJECT-A"),
+        # nexys_a7_dma_audio
+        ("nexys a7", "nexys_a7_dma_audio"),
+        ("nexys-a7", "nexys_a7_dma_audio"),
+        ("nexys_a7", "nexys_a7_dma_audio"),
+        ("nexys_a7_dma_audio", "nexys_a7_dma_audio"),
+        ("dma audio", "nexys_a7_dma_audio"),
+        ("dma ses", "nexys_a7_dma_audio"),
+        ("axis2fifo", "nexys_a7_dma_audio"),
+        ("fifo2audpwm", "nexys_a7_dma_audio"),
+        ("tone_generator", "nexys_a7_dma_audio"),
+        ("helloworld", "nexys_a7_dma_audio"),
+        ("pwm audio", "nexys_a7_dma_audio"),
+        ("aud_pwm", "nexys_a7_dma_audio"),
+        ("s2mm", "nexys_a7_dma_audio"),
+        ("mm2s", "nexys_a7_dma_audio"),
+        ("ddr2", "nexys_a7_dma_audio"),
+        ("mig_7series", "nexys_a7_dma_audio"),
+        ("mt47h", "nexys_a7_dma_audio"),
+        # axi_gpio_example
+        ("nexys video", "axi_gpio_example"),
+        ("axi_gpio_example", "axi_gpio_example"),
+        ("gpio_example", "axi_gpio_example"),   # "xi_gpio_example" typo da yakalar
+        ("axi_gpio_wrapper", "axi_gpio_example"),
+        ("lvcmos25", "axi_gpio_example"),
+        ("lvcmos12", "axi_gpio_example"),
+        # gtx_ddr_example
+        ("gtx_ddr", "gtx_ddr_example"),
+        ("aurora", "gtx_ddr_example"),
+        ("gtx transceiver", "gtx_ddr_example"),
+        ("gtx_ddr_example", "gtx_ddr_example"),
+        # i2c_example
+        ("i2c_example", "i2c_example"),
+        ("create_i2c", "i2c_example"),
+        # pcie_dma_ddr_example
+        ("pcie_dma_ddr", "pcie_dma_ddr_example"),
+        ("pcie dma ddr", "pcie_dma_ddr_example"),
+        ("pcie_dma_ddr_example", "pcie_dma_ddr_example"),
+        # pcie_xdma_mb_example
+        ("xdma mb", "pcie_xdma_mb_example"),
+        ("pcie_xdma_mb", "pcie_xdma_mb_example"),
+        ("pcie_xdma_mb_example", "pcie_xdma_mb_example"),
+        # rgmii_example
+        ("rgmii", "rgmii_example"),
+        ("rgmii_example", "rgmii_example"),
+        # spi_example
+        ("spi_example", "spi_example"),
+        ("create_spi", "spi_example"),
+        # uart_example
+        ("uart_example", "uart_example"),
+        ("create_uart", "uart_example"),
+        # v2_mig
+        ("v2_mig", "v2_mig"),
+        ("mb_dma_ddr3", "v2_mig"),
+        # v3_gtx
+        ("v3_gtx", "v3_gtx"),
+        ("mb_dma_mig_gtx", "v3_gtx"),
     ]
 
-    # Sorguda her iki proje birlikte istendiğinde → None (filtre yok, tüm projeler)
-    _BOTH_PROJECTS_RE = re.compile(
-        r'(her iki proje|iki proje\b|project.a.ve.project.b|proje.a.ve.b'
-        r'|a\s+ve\s+b\s+(?:projesi|için|proje)'
-        r'|her iki\s+(?:proje|sistem|tasarım)'
-        r'|project.a.*project.b|project.b.*project.a)',
+    # Tüm projeler birlikte sorulduğunda → None (global arama, filtre yok)
+    _ALL_PROJECTS_RE = re.compile(
+        r'(her iki proje|iki proje\b|tüm projeler\w*|tüm proje\w*'
+        r'|mevcut projeler\w*|sistemdeki projeler\w*'
+        r'|projelerimiz\w*|projeleriniz\w*'
+        r'|bütün projeler\w*|hangi projeler\w*'
+        r'|projeler(?:in|de|den|le|i|imiz|iniz|imizin|inizin)?\b'
+        r'|referans projeler\w*)',
         re.IGNORECASE,
     )
 
-    def _resolve_project(self, question: str, vector_hits: List[Dict[str, Any]]) -> Optional[str]:
+    def _resolve_project(
+        self,
+        question: str,
+        vector_hits: List[Dict[str, Any]],
+    ) -> Optional[str]:
         """
-        Resolve project filter with three-tier approach:
-          1. Both-projects detection → None (no filter, fetch from all projects)
-          2. High-confidence text keywords → PROJECT-A or PROJECT-B
-          3. Fall back to vector-hit node_id voting
-        Returns PROJECT-A, PROJECT-B, or None.
+        Soru için proje filtresi belirle.
+        Çok projeli / danışman sorularda None döner (global arama).
+
+        Sıra:
+          1. Tüm-projeler pattern → None
+          2. Metin keyword eşleşmesi → gerçek proje adı
+          3. Vector node_id voting fallback
         """
         q_lower = question.lower()
 
-        # Tier 1: Her iki proje birlikte isteniyor → filtre yok
-        if self._BOTH_PROJECTS_RE.search(q_lower):
+        # Tier 1: Tüm projeler isteniyor → filtre yok
+        if self._ALL_PROJECTS_RE.search(q_lower):
             return None
 
-        # Tier 2: Tek proje keyword eşleşmesi
+        # Tier 2: Spesifik proje keyword eşleşmesi
         for keyword, project in self._TEXT_PROJECT_SIGNALS:
             if keyword in q_lower:
                 return project
 
-        # Tier 3: Vector voting fallback
+        # Tier 3: Vector node_id voting fallback
         return self._infer_project(vector_hits)
 
     def _infer_project(self, vector_hits: List[Dict[str, Any]]) -> Optional[str]:
         """
-        Infer project (PROJECT-A or PROJECT-B) from vector hit node_ids.
+        Vector hit node_id'lerinden proje adını tahmin et.
         Node ID convention:
-          - -A- in nid → PROJECT-A (nexys_a7_dma_audio)
-          - -B- in nid → PROJECT-B (axi_gpio_example)
-          - DMA-* or SDOC-A-* → PROJECT-A
-          - AXI-DEC-* → ignored (too ambiguous)
-          - SDOC-*, EVID-*, PAT-* → excluded (not reliable project signals)
-        Returns None if project cannot be determined with high confidence.
+          - COMP-{proj_tag}-* → proje
+          - DMA-* → nexys_a7_dma_audio
+          - SDOC/EVID/PAT → güvenilmez, atla
+        70%+ oy → o proje; aksi halde None (global arama).
         """
-        votes = {"PROJECT-A": 0, "PROJECT-B": 0}
+        votes: Dict[str, int] = {}
         for hit in vector_hits:
             nid = hit.get("node_id", "")
             prefix = nid.split("-")[0] if "-" in nid else nid
-            # Skip unreliable prefixes
             if prefix in ("SDOC", "EVID", "PAT", "AXI", "PATTERN"):
                 continue
-            # DMA-* nodes → nexys_a7_dma_audio = PROJECT-A
             if prefix == "DMA":
-                votes["PROJECT-A"] += 1
+                votes["nexys_a7_dma_audio"] = votes.get("nexys_a7_dma_audio", 0) + 1
                 continue
-            # Standard -A-/-B- pattern
-            if "-A-" in nid or nid.startswith("PROJECT-A") or nid.startswith("REQ-A") or nid.startswith("CONST-A"):
-                votes["PROJECT-A"] += 1
-            elif "-B-" in nid or nid.startswith("PROJECT-B") or nid.startswith("REQ-B") or nid.startswith("CONST-B"):
-                votes["PROJECT-B"] += 1
-        # Only filter if one project dominates (≥ 70% of counted votes, at least 1 vote)
+            # COMP-{tag}-* veya PROJECT-{tag} → tag'den proje adı
+            if nid.startswith("COMP-") and nid.count("-") >= 2:
+                tag = nid.split("-")[1]
+                proj = {
+                    "A": "nexys_a7_dma_audio",
+                    "B": "axi_gpio_example",
+                }.get(tag)
+                if proj:
+                    votes[proj] = votes.get(proj, 0) + 1
+            # Legacy fallback
+            elif "-A-" in nid or nid.startswith("REQ-A") or nid.startswith("CONST-A"):
+                votes["nexys_a7_dma_audio"] = votes.get("nexys_a7_dma_audio", 0) + 1
+            elif "-B-" in nid or nid.startswith("REQ-B") or nid.startswith("CONST-B"):
+                votes["axi_gpio_example"] = votes.get("axi_gpio_example", 0) + 1
+
         total = sum(votes.values())
         if total == 0:
-            return None  # no reliable signal → don't filter
-        for proj, count in votes.items():
-            if count / total >= 0.70:
-                return proj
-        return None  # cross-project query: don't filter
+            return None
+        best_proj, best_count = max(votes.items(), key=lambda x: x[1])
+        if best_count / total >= 0.70:
+            return best_proj
+        return None  # belirsiz → filtre yok
 
     # Turkish → English code term bridge for query augmentation
     _TR_EN_TERMS = {
@@ -686,11 +732,40 @@ class QueryRouter:
         "offset": "offset 0x40000000 0x41E00000 0x80000000 create_bd_addr_seg SEG_GPIO SEG_axi_dma",
         # DDR3/DDR sorguları → MIG 7series (PROJECT-A DDR2 MIG kanalı)
         "ddr3":   "ddr2 mig_7series MIG DDR SDRAM ui_clk mem_if_ddr2",
-        "ddr":    "mig_7series DDR2 ui_clk MIG 7series mem_if_ddr2 SDRAM",
+        "ddr":    "mig_7series DDR2 ui_clk MIG 7series mem_if_ddr2 SDRAM clock period 3077ps 650Mbps MT47H64M16HR",
+        "ddr2":   "DDR2 mig_7series MIG MT47H64M16HR clock period 3077ps 3000ps 650Mbps 667Mbps data_width",
+        "clock period": "clock period 3077ps 3000ps 650Mbps 667Mbps DDR2 MIG recommended max",
+        # IP konfigürasyon sorguları — design_1.tcl ve create_axi_simple.tcl
+        "ip conf": "CONFIG set_property ip tcl axi_gpio axi_dma microblaze clk_wiz NUM_PORTS C_GPIO_WIDTH C_BAUDRATE burst_size design_1",
+        "ip konfigür": "CONFIG set_property ip tcl axi_gpio axi_dma microblaze clk_wiz C_GPIO_WIDTH C_BAUDRATE NUM_MI NUM_SI",
+        "ip bilgi": "CONFIG set_property ip tcl axi_gpio axi_dma microblaze clk_wiz C_GPIO_WIDTH C_BAUDRATE burst_size",
+        "konfigürasyon bilgi": "CONFIG set_property ip tcl axi_gpio C_GPIO_WIDTH C_BAUDRATE NUM_MI NUM_PORTS burst_size",
+        "ip parametre": "CONFIG set_property ip axi_gpio C_GPIO_WIDTH C_IS_DUAL C_BAUDRATE C_mm2s_burst_size NUM_PORTS",
         # MicroBlaze cache konfigürasyon sorguları
         "c_use_icache": "CONFIG.C_USE_ICACHE C_USE_DCACHE microblaze_0 cache 1 0 config",
         "icache": "C_USE_ICACHE C_USE_DCACHE CONFIG microblaze cache ICache DCache",
         "cache konfig": "C_USE_ICACHE C_USE_DCACHE CONFIG.C_USE_ICACHE {1} microblaze",
+        # Ethernet PHY — Nexys A7 SMSC LAN8720A RMII 10/100
+        "ethernet": "ethernet SMSC LAN8720A RMII 10/100 Mb/s PHY RJ-45 axi_ethernetlite axi_ethernet mii_to_rmii 50MHz",
+        "phy": "PHY SMSC LAN8720A RMII ethernet 10/100 Mb/s interface RJ-45",
+        "smsc": "SMSC LAN8720A RMII 10/100 Mb/s Ethernet PHY axi_ethernetlite",
+        "rmii": "RMII mii_to_rmii SMSC 50MHz Ethernet interface reduced MII",
+        # Türkçe donanım bileşen terimleri → İngilizce karşılıkları
+        "ivmeölçer": "accelerometer ADXL362 SPI interrupt motion detection axis",
+        "ivme": "accelerometer ADXL362 SPI g-force motion axis",
+        "sıcaklık": "temperature sensor ADT7420 I2C address register MSB LSB",
+        "sıcaklık sensörü": "temperature ADT7420 I2C 0x48 register MSB LSB Critical Warning",
+        "mikrofon": "microphone PDM pulse density modulation digital interface timing",
+        "vga": "VGA video port horizontal vertical sync timing resolution RGB",
+        "ses çıkışı": "audio output mono PWM amplifier aud_pwm aud_en",
+        "ses": "audio PWM tone fifo2audpwm aud_pwm amplifier",
+        "ekran": "display seven-segment VGA LCD digit anode cathode",
+        "yedi segment": "seven-segment display digit anode cathode encoder",
+        "7 segment": "seven-segment display digit anode cathode encoder",
+        "pmod": "Pmod port connector JA JB JC JD analog digital",
+        "microsd": "MicroSD slot SPI SDHC card",
+        "usb uart": "USB UART serial port bridge FT2232 baud rate",
+        "seri port": "serial port UART USB FT2232 baud 115200",
     }
 
     def _augment_query(self, question: str) -> str:
@@ -698,7 +773,11 @@ class QueryRouter:
         Türkçe soru → İngilizce kod terimlerine çevirerek augmented query üret.
         Embedding'in Türkçe soru ↔ İngilizce kod arasındaki boşluğu kapatır.
         """
-        q_lower = question.lower()
+        # Türkçe büyük İ → küçük i normalizasyonu
+        # Python .lower() converts İ (U+0130) to i + combining dot (U+0069 U+0307)
+        # which breaks substring matching against plain 'i'. Strip combining chars.
+        import unicodedata
+        q_lower = unicodedata.normalize("NFC", question.lower()).replace("\u0307", "")
         augments = []
         for tr_term, en_terms in self._TR_EN_TERMS.items():
             if tr_term in q_lower:
@@ -716,13 +795,14 @@ class QueryRouter:
         self,
         question: str,
         project_filter: Optional[str] = None,
-        file_type_filter: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         SourceChunkStore'u sorgula.
-        Türkçe sorular için augmented query ile daha iyi retrieval sağlar.
-        Sorguda dosya adı geçiyorsa o dosyanın chunk'larını garantili olarak ekler.
-        Store mevcut değilse boş liste döndür (graceful degradation).
+        - project_filter verilirse önce o projeye ait chunk'larda ara (kirlilik önleme).
+          Yeterli sonuç gelmezse global aramayla tamamla.
+        - Türkçe sorular için augmented query ile daha iyi retrieval sağlar.
+        - Sorguda dosya adı geçiyorsa o dosyanın chunk'larını garantili olarak ekler.
+        - Store mevcut değilse boş liste döndür (graceful degradation).
         """
         if self.source_store is None:
             return []
@@ -730,8 +810,6 @@ class QueryRouter:
             augmented_q = self._augment_query(question)
 
             # File-name boost: sorguda belirtilen dosyaların en ilgili chunk'larını getir.
-            # search_within_file() kullanarak büyük dosyalarda (design_1.tcl gibi)
-            # context bloat'u önle — sadece sorguya semantik olarak en yakın N chunk döner.
             file_chunks: List[Dict[str, Any]] = []
             seen_ids: set = set()
             mentioned_stems = self._SOURCE_FILE_RE.findall(question)
@@ -741,19 +819,38 @@ class QueryRouter:
                         seen_ids.add(h["chunk_id"])
                         file_chunks.append(h)
 
-            # Genel semantik arama
-            general_hits = self.source_store.search(
-                augmented_q,
-                n_results=self.n_source,
-                project_filter=project_filter,
-                file_type_filter=file_type_filter,
-            )
+            # Proje filtreli arama (proje tespit edildiyse)
+            if project_filter:
+                filtered_hits = self.source_store.search(
+                    augmented_q,
+                    n_results=self.n_source,
+                    project_filter=project_filter,
+                )
+                for h in filtered_hits:
+                    if h["chunk_id"] not in seen_ids:
+                        seen_ids.add(h["chunk_id"])
+                        file_chunks.append(h)
 
-            # Birleştir: dosya adı eşleşenleri önce, sonra genel sonuçlar
-            for h in general_hits:
-                if h["chunk_id"] not in seen_ids:
-                    seen_ids.add(h["chunk_id"])
-                    file_chunks.append(h)
+                # Yeterli sonuç geldiyse bitir; az geldiyse global aramayla tamamla
+                min_needed = max(3, self.n_source // 3)
+                if len(file_chunks) >= min_needed:
+                    return file_chunks
+                # Fallback: eksik kalan kadar global aramadan al
+                remaining = self.n_source - len(file_chunks)
+                global_hits = self.source_store.search(augmented_q, n_results=remaining + 4)
+                for h in global_hits:
+                    if h["chunk_id"] not in seen_ids:
+                        seen_ids.add(h["chunk_id"])
+                        file_chunks.append(h)
+                        if len(file_chunks) >= self.n_source:
+                            break
+            else:
+                # Proje belirsiz → global arama
+                general_hits = self.source_store.search(augmented_q, n_results=self.n_source)
+                for h in general_hits:
+                    if h["chunk_id"] not in seen_ids:
+                        seen_ids.add(h["chunk_id"])
+                        file_chunks.append(h)
 
             return file_chunks
         except Exception as e:

@@ -99,7 +99,7 @@ def load_rag_v2():
     from rag_v2.hallucination_gate import HallucinationGate
 
     graph_path  = str(_ROOT / "db" / "graph" / "fpga_rag_v2_graph.json")
-    chroma_path = str(_ROOT / "db" / "chroma_graph_nodes")
+    chroma_path = str(_ROOT / "db" / "chroma_v2")
 
     if not Path(graph_path).exists():
         st.error("Graph DB bulunamadı. Önce: `python scripts/build_graph_db.py`")
@@ -121,7 +121,7 @@ def load_rag_v2():
         except Exception as e:
             sc = None  # Graceful degradation
 
-    router = QueryRouter(gs, vs, source_chunk_store=sc, n_vector_results=6, n_source_results=10)
+    router = QueryRouter(gs, vs, source_chunk_store=sc, n_vector_results=6, n_source_results=16)
     gate = HallucinationGate(gs)
 
     stats = gs.stats()
@@ -415,7 +415,7 @@ if prompt:
             # LLM
             st.write("🤖 LLM yanıt üretiyor…")
             from rag_v2.response_builder import build_llm_context, FPGA_RAG_SYSTEM_PROMPT
-            ctx = build_llm_context(qr, gr, max_nodes=12, max_chars=14000)
+            ctx = build_llm_context(qr, gr, max_nodes=15, max_chars=22000)
 
             system = FPGA_RAG_SYSTEM_PROMPT.split("CONTEXT:")[0].strip()
 

@@ -775,9 +775,10 @@ class SourceChunkStore:
             tmp = VectorStoreV2.__new__(VectorStoreV2)
             tmp._embedder = None
             from sentence_transformers import SentenceTransformer
-            import torch
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            self._embedder = SentenceTransformer("all-mpnet-base-v2", device=device)
+            import os
+            # CUDA 12.1 > PyTorch max 12.0 — force CPU to avoid hang
+            os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+            self._embedder = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2", device="cpu")
         return self._embedder
 
     def _get_collection(self):
