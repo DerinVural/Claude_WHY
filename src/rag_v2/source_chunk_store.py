@@ -89,7 +89,147 @@ class SourceFileChunker:
     Dosya tipine göre içeriği anlamlı parçalara böler.
     Her chunk, bağımsız olarak semantic arama yapılabilecek kadar
     anlamlı bir birim olmalıdır.
+
+    Index-time semantic enrichment: Her chunk'a dosya türüne göre
+    okunabilir özet başlık eklenir. Bu sayede embedding modeli
+    Türkçe/İngilizce doğal dil sorguları ile teknik sözdizimi arasındaki
+    boşluğu kapatır — query-time augmentation'a gerek kalmaz.
     """
+
+    # ---------------------------------------------------------------
+    # Semantic summary generators — index time, no LLM, pure regex
+    # ---------------------------------------------------------------
+
+    @staticmethod
+    def _xdc_pin_summary(content: str, file_name: str) -> str:
+        """
+        XDC içeriğinden pin atamalarını çıkar, okunabilir özet üret.
+        Desteklenen formatlar:
+          A) set_property -dict {PACKAGE_PIN X IOSTANDARD Y} [get_ports {sig}]
+          B) set_property PACKAGE_PIN X [get_ports {sig}]   (ayrı satır)
+        """
+        entries: dict[str, tuple[str, str]] = {}
+
+        # Format A — tek satır dict form
+        re_a = re.compile(
+            r'set_property\s+-dict\s+[{\[]\s*PACKAGE_PIN\s+(\w+)\s+IOSTANDARD\s+(\w+)\s*[}\]]\s*'
+            r'\[get_ports\s+[{\[]?\s*([^\]\}]+?)\s*[}\]]?\]',
+            re.IGNORECASE,
+        )
+        for m in re_a.finditer(content):
+            entries[m.group(3).strip()] = (m.group(1), m.group(2))
+
+        # Format B — iki ayrı set_property satırı
+        re_pin = re.compile(r'set_property\s+PACKAGE_PIN\s+(\w+)\s+\[get_ports\s+[{\[]?\s*([^\]\}]+?)\s*[}\]]?\]', re.IGNORECASE)
+        re_std = re.compile(r'set_property\s+IOSTANDARD\s+(\w+)\s+\[get_ports\s+[{\[]?\s*([^\]\}]+?)\s*[}\]]?\]', re.IGNORECASE)
+        pins: dict[str, str] = {m.group(2).strip(): m.group(1) for m in re_pin.finditer(content)}
+        stds: dict[str, str] = {m.group(2).strip(): m.group(1) for m in re_std.finditer(content)}
+        for sig, pin in pins.items():
+            if sig not in entries:
+                entries[sig] = (pin, stds.get(sig, ""))
+
+        if not entries:
+            return ""
+
+        lines = [f"  {sig} -> {pin}" + (f" {std}" if std else "")
+                 for sig, (pin, std) in sorted(entries.items())]
+        return f"[XDC Pin Assignments — {file_name}]\n" + "\n".join(lines) + "\n---\n"
+
+    @staticmethod
+    def _tcl_ip_summary(content: str, file_name: str) -> str:
+        """
+        TCL/BD-TCL chunk'ındaki IP örnekleri ve CONFIG parametrelerini özetle.
+        create_bd_cell + set_property CONFIG bloklarını parse eder.
+        """
+        # VLNV ve IP adı
+        vlnv_re = re.compile(r'create_bd_cell\s+-type\s+ip\s+-vlnv\s+(\S+)\s+(\w+)', re.IGNORECASE)
+        # CONFIG parametreleri (hem -dict hem ayrı satır)
+        cfg_re = re.compile(r'CONFIG\.(\w+)\s+[{\[]?([^\s\]}\n]+)', re.IGNORECASE)
+        # address segment
+        addr_re = re.compile(r'create_bd_addr_seg.*?-offset\s+(0x[0-9a-fA-F]+)', re.IGNORECASE)
+
+        ips = vlnv_re.findall(content)
+        cfgs = cfg_re.findall(content)
+        addrs = addr_re.findall(content)
+
+        if not ips and not cfgs and not addrs:
+            return ""
+
+        parts = []
+        if ips:
+            ip_lines = [f"  {name}: {vlnv.split(':')[-2] if ':' in vlnv else vlnv}"
+                        for vlnv, name in ips[:6]]
+            parts.append("[IP Instances]\n" + "\n".join(ip_lines))
+        if cfgs:
+            cfg_lines = [f"  {k} = {v}" for k, v in cfgs[:12]]
+            parts.append("[IP Configuration]\n" + "\n".join(cfg_lines))
+        if addrs:
+            parts.append("[Address Map]\n" + "\n".join(f"  offset {a}" for a in addrs[:8]))
+
+        return "\n".join(parts) + "\n---\n"
+
+    @staticmethod
+    def _c_func_summary(func_name: str, func_body: str) -> str:
+        """C fonksiyon chunk'ı için kısa özet başlık."""
+        # Önemli API çağrılarını bul
+        api_re = re.compile(r'\b(X\w+(?:Initialize|Config|Send|Recv|Start|Stop|Reset|Enable|Disable|Transfer)\w*)\s*\(', re.IGNORECASE)
+        # define sabitleri
+        define_re = re.compile(r'#define\s+(\w+)\s+(\S+)')
+        apis = list(dict.fromkeys(api_re.findall(func_body)))[:5]
+        defines = define_re.findall(func_body)[:4]
+
+        lines = [f"[C Function: {func_name}]"]
+        if apis:
+            lines.append("  API calls: " + ", ".join(apis))
+        if defines:
+            lines.append("  Defines: " + ", ".join(f"{k}={v}" for k, v in defines))
+        return "\n".join(lines) + "\n---\n"
+
+    @staticmethod
+    def _c_header_summary(content: str, file_name: str) -> str:
+        """C header/include chunk'ı için özet başlık."""
+        define_re = re.compile(r'#define\s+(\w+)\s+(\S+)')
+        struct_re = re.compile(r'typedef\s+struct\s*\{[^}]+\}\s*(\w+)\s*;', re.DOTALL)
+        enum_re = re.compile(r'typedef\s+enum\s*\{([^}]+)\}\s*(\w+)\s*;', re.DOTALL)
+
+        defines = define_re.findall(content)[:6]
+        structs = struct_re.findall(content)
+        enums = [(m.group(2), [e.strip().split('=')[0].strip() for e in m.group(1).split(',') if e.strip()][:4])
+                 for m in enum_re.finditer(content)]
+
+        if not defines and not structs and not enums:
+            return ""
+
+        lines = [f"[C Definitions — {file_name}]"]
+        if defines:
+            lines.append("  Constants: " + ", ".join(f"{k}={v}" for k, v in defines))
+        if structs:
+            lines.append("  Structs: " + ", ".join(structs))
+        if enums:
+            for ename, members in enums:
+                lines.append(f"  Enum {ename}: " + ", ".join(members))
+        return "\n".join(lines) + "\n---\n"
+
+    @staticmethod
+    def _verilog_module_summary(module_name: str, content: str) -> str:
+        """Verilog modülü için port/parametre özeti."""
+        param_re = re.compile(r'parameter\s+(\w+)\s*=\s*(\S+)', re.IGNORECASE)
+        port_re = re.compile(r'^\s*(input|output|inout)\s+(?:wire\s+|reg\s+)?(?:\[\d+:\d+\]\s+)?(\w+)', re.MULTILINE | re.IGNORECASE)
+        params = param_re.findall(content)[:6]
+        ports_in = [p for d, p in port_re.findall(content) if d.lower() == 'input'][:6]
+        ports_out = [p for d, p in port_re.findall(content) if d.lower() == 'output'][:6]
+
+        if not params and not ports_in and not ports_out:
+            return ""
+
+        lines = [f"[Verilog Module: {module_name}]"]
+        if params:
+            lines.append("  Parameters: " + ", ".join(f"{k}={v}" for k, v in params))
+        if ports_in:
+            lines.append("  Inputs: " + ", ".join(ports_in))
+        if ports_out:
+            lines.append("  Outputs: " + ", ".join(ports_out))
+        return "\n".join(lines) + "\n---\n"
 
     def chunk_file(
         self,
@@ -159,10 +299,13 @@ class SourceFileChunker:
             mod_match = re.search(r'module\s+(\w+)', text)
             label = mod_match.group(1) if mod_match else f"module_{i+1}"
 
+            summary = self._verilog_module_summary(label, text)
+            enriched = (summary + text) if summary else text
+
             chunk_id = f"{Path(file_path).stem}_{label}"
             chunks.append(SourceChunk(
                 chunk_id=chunk_id,
-                content=text[:MAX_CHUNK_CHARS],
+                content=enriched[:MAX_CHUNK_CHARS],
                 file_path=file_path,
                 file_type="verilog",
                 project=project,
@@ -238,9 +381,12 @@ class SourceFileChunker:
             start_line = content[:start_pos].count("\n") + 1
             end_line = content[:end_pos].count("\n") + 1
 
+            summary = self._c_func_summary(func_name, text)
+            enriched = (summary + text) if summary else text
+
             # Büyük fonksiyonları böl
-            if len(text) > MAX_CHUNK_CHARS:
-                for j, sub in enumerate(self._split_text(text)):
+            if len(enriched) > MAX_CHUNK_CHARS:
+                for j, sub in enumerate(self._split_text(enriched)):
                     chunks.append(SourceChunk(
                         chunk_id=f"{file_prefix}_{func_name}_{start_line}_{j}",
                         content=sub,
@@ -255,7 +401,7 @@ class SourceFileChunker:
             else:
                 chunks.append(SourceChunk(
                     chunk_id=f"{file_prefix}_{func_name}_{start_line}",
-                    content=text,
+                    content=enriched,
                     file_path=file_path,
                     file_type="c",
                     project=project,
@@ -311,9 +457,11 @@ class SourceFileChunker:
 
         if not matches:
             # Struct yok → tek chunk
+            summary = self._c_header_summary(header_text, Path(file_path).name)
+            enriched = (summary + header_text) if summary else header_text
             return [SourceChunk(
                 chunk_id=f"{file_prefix}_headers",
-                content=header_text[:MAX_CHUNK_CHARS],
+                content=enriched[:MAX_CHUNK_CHARS],
                 file_path=file_path,
                 file_type="c",
                 project=project,
@@ -330,9 +478,11 @@ class SourceFileChunker:
             # struct öncesi içerik (includes + defines)
             pre = header_text[last_pos:m.start()].strip()
             if pre and i == 0:
+                summary = self._c_header_summary(pre, Path(file_path).name)
+                enriched_pre = (summary + pre) if summary else pre
                 chunks.append(SourceChunk(
                     chunk_id=f"{file_prefix}_headers_pre",
-                    content=pre[:MAX_CHUNK_CHARS],
+                    content=enriched_pre[:MAX_CHUNK_CHARS],
                     file_path=file_path,
                     file_type="c",
                     project=project,
@@ -421,15 +571,20 @@ class SourceFileChunker:
 
     def _chunk_xdc(self, content: str, file_path: str, project: str,
                    node_ids: List[str]) -> List[SourceChunk]:
-        if len(content) <= MAX_CHUNK_CHARS:
-            return self._whole_file_chunk(content, file_path, "xdc", project, node_ids)
+        # Her XDC chunk'ına pin özeti ekle (index-time semantic enrichment)
+        pin_summary = self._xdc_pin_summary(content, Path(file_path).name)
+        enriched = pin_summary + content if pin_summary else content
+
+        if len(enriched) <= MAX_CHUNK_CHARS:
+            return self._whole_file_chunk(enriched, file_path, "xdc", project, node_ids)
 
         # Büyük XDC: ## başlıklı bölümlere göre böl
         # NOTE: Some XDC files use "## Section" (with space) and some "##Section" (no space)
         # Ayrıca "#PWM Audio Amplifier" gibi tek-hash subsection başlıkları da bölünüyor:
         # ^#(?=[A-Z]) — tek # + büyük harf (commented set_property'ler küçük harf ile başlar)
+        fname = Path(file_path).name
         chunks = []
-        sections = re.split(r'(?m)^##\s*|^#(?=[A-Z])', content)
+        sections = re.split(r'(?m)^##\s*|^#(?=[A-Z])', content)  # original content ile böl
         for i, sec in enumerate(sections):
             if not sec.strip():
                 continue
@@ -437,9 +592,12 @@ class SourceFileChunker:
             label = re.sub(r'[^\w\s]', '', first_line)[:40] or f"section_{i}"
             start_line = content[:content.find(sec)].count("\n") + 1 if sec in content else 0
             end_line = start_line + sec.count("\n")
+            # Her section'a o section'ın pin özetini ekle
+            sec_summary = self._xdc_pin_summary(sec, fname)
+            sec_enriched = (sec_summary + sec) if sec_summary else sec
             chunks.append(SourceChunk(
                 chunk_id=f"{Path(file_path).stem}_{i}_{label.replace(' ','_')}",
-                content=sec[:MAX_CHUNK_CHARS],
+                content=sec_enriched[:MAX_CHUNK_CHARS],
                 file_path=file_path,
                 file_type="xdc",
                 project=project,
@@ -523,7 +681,9 @@ class SourceFileChunker:
                         blk = proc_body[blk_start:blk_end].strip()
                         blk_sl = sl + proc_body[:blk_start].count("\n")
                         blk_el = sl + proc_body[:blk_end].count("\n")
-                        for j, sub in enumerate(self._split_text(blk) if len(blk) > MAX_CHUNK_CHARS else [blk]):
+                        summary = self._tcl_ip_summary(blk, Path(file_path).name)
+                        enriched_blk = (summary + blk) if summary else blk
+                        for j, sub in enumerate(self._split_text(enriched_blk) if len(enriched_blk) > MAX_CHUNK_CHARS else [enriched_blk]):
                             chunks.append(SourceChunk(
                                 chunk_id=f"{stem}_{ip_name}_{j}" if j else f"{stem}_{ip_name}",
                                 content=sub,
@@ -857,11 +1017,18 @@ class SourceChunkStore:
         if col.count() == 0:
             return []
 
-        where = {}
+        # ChromaDB: tek koşul → {"field": value}, çoklu koşul → {"$and": [...]}
+        conditions = []
         if project_filter:
-            where["project"] = project_filter
+            conditions.append({"project": project_filter})
         if file_type_filter:
-            where["file_type"] = file_type_filter
+            conditions.append({"file_type": file_type_filter})
+        if len(conditions) == 0:
+            where = {}
+        elif len(conditions) == 1:
+            where = conditions[0]
+        else:
+            where = {"$and": conditions}
 
         try:
             embedding = self.embed_texts([query])[0]

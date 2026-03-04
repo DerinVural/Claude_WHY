@@ -37,40 +37,38 @@ load_dotenv(_ROOT / ".env")
 # Her proje için: project_id, kaynak dizinleri, ilgili graph node_id'leri
 # NOT: Graph'taki PROJECT-A = nexys_a7_dma_audio, PROJECT-B = axi_gpio_example
 
+_VT = str(Path.home() / "Desktop/fpga_asist_dev-master/fpga_asist_dev-master/validation_test")
+
 PROJECT_SOURCE_CATALOG = [
+    # ── PROJECT-A: Nexys A7 DMA Audio ────────────────────────────────────────
     {
-        "project": "PROJECT-A",       # nexys_a7_dma_audio
+        "project": "nexys_a7_dma_audio",
         "display_name": "Nexys A7 DMA Audio",
         "roots": [
             str(_ROOT / "data/code/Nexys-A7-100T-DMA-Audio"),
         ],
-        # Dahil edilecek uzantılar (.md hariç: Türkçe içerik gürültü yaratıyor)
         "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".json"],
-        # Hariç tutulacak dizin/dosya kalıpları
         "exclude_patterns": [".git", "__pycache__", "node_modules", ".ip_user_files",
                               "_pycache_", "sim_", ".cache"],
-        # Dosya → graph node_id eşleştirmesi (otomatik olarak graph'tan türetilir)
         "file_node_map": {
             "axis2fifo.v": ["COMP-A-axis2fifo_0"],
             "fifo2audpwm.v": ["COMP-A-fifo2audpwm_0"],
             "tone_generator.v": ["COMP-A-tone_generator_0"],
             "design_1.tcl": ["COMP-A-axi_dma_0", "COMP-A-mig_7series_0"],
             "Nexys-A7-100T-Master.xdc": ["COMP-A-clk_wiz_0"],
-            "Nexys-A7-50T-Master.xdc": ["COMP-A-clk_wiz_0"],
             "helloworld.c": ["COMP-A-helloworld", "COMP-A-axi_dma_0"],
             "platform.c": [],
             "platform.h": [],
         },
     },
+    # ── PROJECT-B: AXI GPIO Example (Nexys Video) ────────────────────────────
     {
-        "project": "PROJECT-B",       # axi_gpio_example
+        "project": "axi_gpio_example",
         "display_name": "AXI GPIO Example (Nexys Video)",
         "roots": [
-            # Desktop'taki geliştirme dizini
-            str(Path.home() / "Desktop/fpga_asist_dev-master/fpga_asist_dev-master/validation_test/axi_example"),
+            f"{_VT}/axi_example",
         ],
         "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".json"],
-        # .md ve .txt hariç: README/SYNTHESIS_RESULTS Türkçe içerip sorgu gürültüsü yaratıyor
         "exclude_patterns": [".git", "__pycache__", "vivado_minimal_mb", "RUN_AXI"],
         "file_node_map": {
             "nexys_video.xdc": ["COMP-B-clk_wiz_0", "COMP-B-rst_clk_wiz_0_100M"],
@@ -79,16 +77,85 @@ PROJECT_SOURCE_CATALOG = [
             "add_axi_gpio.tcl": ["COMP-B-axi_gpio_0", "COMP-B-microblaze_0_axi_periph"],
             "create_minimal_microblaze.tcl": ["COMP-B-microblaze_0", "COMP-B-clk_wiz_0", "COMP-B-mdm_1"],
             "create_axi_simple_gpio.tcl": ["COMP-B-axi_gpio_0"],
-            "utilization_summary.txt": ["COMP-B-microblaze_0", "COMP-B-clk_wiz_0"],
             "SYNTHESIS_RESULTS.md": ["COMP-B-microblaze_0", "COMP-B-axi_gpio_0", "COMP-B-clk_wiz_0"],
         },
-        # SYNTHESIS_RESULTS.md: extension filter bypass ile ekleniyor (.md hariç tutuluyor ama
-        # bu dosya kritik sentez verisini içeriyor — LUT:1,412 / microblaze_bd_wrapper)
         "specific_files": [
-            str(Path.home() / "Desktop/fpga_asist_dev-master/fpga_asist_dev-master/validation_test/axi_example/SYNTHESIS_RESULTS.md"),
-            # Nexys Video Master XDC: CFGBVS=VCCO, CONFIG_VOLTAGE=3.3 ve board pin referansı için
-            str(Path(__file__).parent.parent / "data/code/digilent-xdc/Nexys-Video-Master.xdc"),
+            f"{_VT}/axi_example/SYNTHESIS_RESULTS.md",
+            str(_ROOT / "data/code/digilent-xdc/Nexys-Video-Master.xdc"),
         ],
+    },
+    # ── Validation test projects ──────────────────────────────────────────────
+    {
+        "project": "gtx_ddr_example",
+        "display_name": "GTX DDR Example (Nexys Video)",
+        "roots": [f"{_VT}/gtx_ddr_example"],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "file_node_map": {},
+    },
+    {
+        "project": "i2c_example",
+        "display_name": "I2C Example (Nexys Video)",
+        "roots": [f"{_VT}/i2c_example"],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "file_node_map": {},
+    },
+    {
+        "project": "pcie_dma_ddr_example",
+        "display_name": "PCIe DMA DDR Example",
+        "roots": [f"{_VT}/pcie_dma_ddr_example"],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "file_node_map": {},
+    },
+    {
+        "project": "pcie_xdma_mb_example",
+        "display_name": "PCIe XDMA MicroBlaze Example",
+        "roots": [f"{_VT}/pcie_xdma_mb_example"],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "file_node_map": {},
+    },
+    {
+        "project": "rgmii_example",
+        "display_name": "RGMII Ethernet Example (Nexys Video)",
+        "roots": [f"{_VT}/rgmii_example"],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "file_node_map": {},
+    },
+    {
+        "project": "v2_mig",
+        "display_name": "MIG DDR3 v2 Example",
+        "roots": [f"{_VT}/v2_mig"],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "file_node_map": {},
+    },
+    {
+        "project": "v3_gtx",
+        "display_name": "GTX Transceiver v3 Example",
+        "roots": [f"{_VT}/v3_gtx"],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "file_node_map": {},
+    },
+    {
+        "project": "spi_example",
+        "display_name": "SPI Pmod Example (Nexys Video)",
+        "roots": [f"{_VT}/spi_example"],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "file_node_map": {},
+    },
+    {
+        "project": "uart_example",
+        "display_name": "UART Example",
+        "roots": [f"{_VT}/uart_example"],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "file_node_map": {},
     },
 ]
 
