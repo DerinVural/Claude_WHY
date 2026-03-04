@@ -907,14 +907,19 @@ class SourceFileChunker:
 
 class SourceChunkStore:
     """
-    Kaynak dosya chunk'larının ChromaDB vektör deposu.
+    Kaynak dosya chunk'larının ChromaDB vektör deposu + BM25 keyword indeksi.
 
     Architecture: fpga_rag_architecture_v2.md — 4th store eki.
     Graph node store  → mimari metadata
     Source chunk store → implementasyon detayı (RTL, SW, XDC, TCL)
+
+    Hybrid search: BM25 (exact keyword) + semantic (embedding) → RRF merge
+    Bu sayede Türkçe doğal dil sorgular teknik kod içeriğini query-time
+    augmentation'a ihtiyaç duymadan bulur.
     """
 
     COLLECTION_NAME = "source_chunks"
+    _RRF_K = 60       # Reciprocal Rank Fusion sabit parametresi
 
     def __init__(
         self,
@@ -927,6 +932,148 @@ class SourceChunkStore:
         self._collection = None
         self._embedder = None
         self._chunker = SourceFileChunker()
+        # BM25 index — lazy build, invalidate on add/reset
+        self._bm25 = None
+        self._bm25_ids: List[str] = []
+        self._bm25_metas: List[Dict] = []
+        self._bm25_docs: List[str] = []
+
+    # ------------------------------------------------------------------
+    # BM25 tokenizer ve index
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _bm25_tokenize(text: str) -> List[str]:
+        """
+        BM25 için tokenize et.
+        - Alfanumerik + alt çizgi token'larını ayır (PACKAGE_PIN, spi_mosi, AB22)
+        - Alt çizgili token'ları da parçalara böl (spi_mosi → spi, mosi)
+        - Küçük harf: PACKAGE_PIN = package_pin = Package_Pin
+        """
+        full = re.findall(r'[a-zA-Z0-9_]+', text.lower())
+        tokens: List[str] = []
+        for t in full:
+            tokens.append(t)
+            if '_' in t:
+                tokens.extend(p for p in t.split('_') if p)
+        return tokens
+
+    def _ensure_bm25(self):
+        """BM25 index yoksa ChromaDB'den sıfırdan kur."""
+        if self._bm25 is not None:
+            return
+        try:
+            from rank_bm25 import BM25Okapi
+        except ImportError:
+            return  # rank-bm25 yüklü değilse sessizce atla
+
+        col = self._get_collection()
+        if col.count() == 0:
+            return
+
+        data = col.get(include=["documents", "metadatas"])
+        self._bm25_ids   = data.get("ids", [])
+        self._bm25_metas = data.get("metadatas", [])
+        self._bm25_docs  = data.get("documents", [])
+        tokenized = [self._bm25_tokenize(doc) for doc in self._bm25_docs]
+        self._bm25 = BM25Okapi(tokenized)
+
+    def _invalidate_bm25(self):
+        """Yeni chunk eklenince veya reset'te BM25 index'i sıfırla."""
+        self._bm25 = None
+        self._bm25_ids = []
+        self._bm25_metas = []
+        self._bm25_docs = []
+
+    def _bm25_search(
+        self,
+        query: str,
+        n_results: int,
+        project_filter: Optional[str],
+        file_type_filter: Optional[str],
+    ) -> List[Dict[str, Any]]:
+        """
+        BM25 keyword arama — filtrelenmiş alt küme üzerinde çalışır.
+        Döndürülen dict'ler semantic search ile aynı yapıda; similarity yerine bm25_score.
+        """
+        self._ensure_bm25()
+        if self._bm25 is None or not self._bm25_ids:
+            return []
+
+        # Filtre uygula
+        indices = [
+            i for i, m in enumerate(self._bm25_metas)
+            if (not project_filter or m.get("project") == project_filter)
+            and (not file_type_filter or m.get("file_type") == file_type_filter)
+        ]
+        if not indices:
+            return []
+
+        # BM25 skorlarını sadece filtrelenmiş subset üzerinde hesapla
+        query_tokens = self._bm25_tokenize(query)
+        # BM25Okapi.get_batch_scores subset için
+        scores = self._bm25.get_batch_scores(query_tokens, indices)
+
+        # (score, global_index) çiftleri, azalan sırada
+        ranked = sorted(zip(scores, indices), key=lambda x: x[0], reverse=True)
+
+        results = []
+        for score, idx in ranked[:n_results]:
+            if score <= 0:
+                break
+            meta = self._bm25_metas[idx]
+            node_ids_raw = meta.get("related_node_ids", "[]")
+            try:
+                node_ids = json.loads(node_ids_raw) if node_ids_raw else []
+            except Exception:
+                node_ids = []
+            results.append({
+                "chunk_id":        meta.get("chunk_id", ""),
+                "content":         self._bm25_docs[idx],
+                "file_path":       meta.get("file_path", ""),
+                "file_type":       meta.get("file_type", ""),
+                "project":         meta.get("project", ""),
+                "start_line":      meta.get("start_line", 0),
+                "end_line":        meta.get("end_line", 0),
+                "chunk_label":     meta.get("chunk_label", ""),
+                "similarity":      round(score, 4),   # BM25 raw score
+                "related_node_ids": node_ids,
+            })
+        return results
+
+    @staticmethod
+    def _rrf_merge(
+        semantic: List[Dict[str, Any]],
+        bm25: List[Dict[str, Any]],
+        n_results: int,
+        k: int = 60,
+    ) -> List[Dict[str, Any]]:
+        """
+        Reciprocal Rank Fusion — iki listeyi rank'a göre birleştir.
+        score(d) = Σ 1/(k + rank_i(d))
+        """
+        rrf: Dict[str, float] = {}
+        best: Dict[str, Dict] = {}
+
+        for rank, hit in enumerate(semantic, 1):
+            cid = hit["chunk_id"]
+            rrf[cid] = rrf.get(cid, 0.0) + 1.0 / (k + rank)
+            best[cid] = hit  # semantic hit'i temel al (similarity alanı var)
+
+        for rank, hit in enumerate(bm25, 1):
+            cid = hit["chunk_id"]
+            rrf[cid] = rrf.get(cid, 0.0) + 1.0 / (k + rank)
+            if cid not in best:
+                best[cid] = hit
+
+        # RRF skoruna göre sırala
+        sorted_ids = sorted(rrf, key=lambda x: rrf[x], reverse=True)
+        merged = []
+        for cid in sorted_ids[:n_results]:
+            hit = dict(best[cid])
+            hit["rrf_score"] = round(rrf[cid], 6)
+            merged.append(hit)
+        return merged
 
     def _get_embedder(self):
         if self._embedder is None:
@@ -989,6 +1136,7 @@ class SourceChunkStore:
             except Exception as e:
                 print(f"  [SourceChunkStore] Batch hata: {e}")
 
+        self._invalidate_bm25()   # yeni chunk'lar → BM25 yeniden kurulacak
         return stored
 
     def add_file(
@@ -1009,71 +1157,83 @@ class SourceChunkStore:
         file_type_filter: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Semantic arama.
+        Hybrid arama: BM25 keyword + semantic embedding → RRF merge.
+
+        - Semantic: ChromaDB cosine similarity (kavramsal eşleşme)
+        - BM25: exact keyword match (teknik terim, pin numarası, sinyal adı)
+        - RRF: iki listeyi rank'a göre parametre-free birleştir
+
         Her sonuç: {chunk_id, content, file_path, file_type, project,
-                    start_line, end_line, chunk_label, similarity, related_node_ids}
+                    start_line, end_line, chunk_label, similarity, rrf_score, related_node_ids}
         """
         col = self._get_collection()
         if col.count() == 0:
             return []
 
-        # ChromaDB: tek koşul → {"field": value}, çoklu koşul → {"$and": [...]}
+        # Çok az chunk varsa n_results'ı sınırla
+        total = col.count()
+        n_candidates = min(n_results * 3, total)
+
+        # ── 1. Semantic search ───────────────────────────────────────────────
         conditions = []
         if project_filter:
             conditions.append({"project": project_filter})
         if file_type_filter:
             conditions.append({"file_type": file_type_filter})
-        if len(conditions) == 0:
-            where = {}
-        elif len(conditions) == 1:
-            where = conditions[0]
-        else:
-            where = {"$and": conditions}
+        where = (
+            {}                     if len(conditions) == 0 else
+            conditions[0]          if len(conditions) == 1 else
+            {"$and": conditions}
+        )
 
+        semantic_hits: List[Dict[str, Any]] = []
         try:
             embedding = self.embed_texts([query])[0]
             kwargs: Dict[str, Any] = {
                 "query_embeddings": [embedding],
-                "n_results": min(n_results, col.count()),
+                "n_results": min(n_candidates, total),
                 "include": ["documents", "metadatas", "distances"],
             }
             if where:
                 kwargs["where"] = where
 
             raw = col.query(**kwargs)
+            docs      = raw.get("documents", [[]])[0]
+            metas     = raw.get("metadatas", [[]])[0]
+            distances = raw.get("distances", [[]])[0]
+
+            for doc, meta, dist in zip(docs, metas, distances):
+                similarity = max(0.0, 1.0 - dist)
+                if similarity < self.threshold:
+                    continue
+                node_ids_raw = meta.get("related_node_ids", "[]")
+                try:
+                    node_ids = json.loads(node_ids_raw) if node_ids_raw else []
+                except Exception:
+                    node_ids = []
+                semantic_hits.append({
+                    "chunk_id":        meta.get("chunk_id", ""),
+                    "content":         doc,
+                    "file_path":       meta.get("file_path", ""),
+                    "file_type":       meta.get("file_type", ""),
+                    "project":         meta.get("project", ""),
+                    "start_line":      meta.get("start_line", 0),
+                    "end_line":        meta.get("end_line", 0),
+                    "chunk_label":     meta.get("chunk_label", ""),
+                    "similarity":      round(similarity, 4),
+                    "related_node_ids": node_ids,
+                })
         except Exception as e:
-            print(f"  [SourceChunkStore] Search hata: {e}")
-            return []
+            print(f"  [SourceChunkStore] Semantic search hata: {e}")
 
-        results = []
-        docs      = raw.get("documents", [[]])[0]
-        metas     = raw.get("metadatas", [[]])[0]
-        distances = raw.get("distances", [[]])[0]
+        # ── 2. BM25 search ───────────────────────────────────────────────────
+        bm25_hits = self._bm25_search(query, n_candidates, project_filter, file_type_filter)
 
-        for doc, meta, dist in zip(docs, metas, distances):
-            similarity = max(0.0, 1.0 - dist)
-            if similarity < self.threshold:
-                continue
-            node_ids_raw = meta.get("related_node_ids", "[]")
-            try:
-                node_ids = json.loads(node_ids_raw) if node_ids_raw else []
-            except Exception:
-                node_ids = []
-
-            results.append({
-                "chunk_id": meta.get("chunk_id", ""),
-                "content": doc,
-                "file_path": meta.get("file_path", ""),
-                "file_type": meta.get("file_type", ""),
-                "project": meta.get("project", ""),
-                "start_line": meta.get("start_line", 0),
-                "end_line": meta.get("end_line", 0),
-                "chunk_label": meta.get("chunk_label", ""),
-                "similarity": round(similarity, 4),
-                "related_node_ids": node_ids,
-            })
-
-        return results
+        # ── 3. RRF merge ─────────────────────────────────────────────────────
+        if bm25_hits:
+            return self._rrf_merge(semantic_hits, bm25_hits, n_results, self._RRF_K)
+        # BM25 yoksa (rank-bm25 kurulmamış) → sadece semantic
+        return semantic_hits[:n_results]
 
     def search_within_file(
         self,
@@ -1231,3 +1391,4 @@ class SourceChunkStore:
             pass
         self._collection = None
         self._client = None
+        self._invalidate_bm25()

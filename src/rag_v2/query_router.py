@@ -687,87 +687,39 @@ class QueryRouter:
             return best_proj
         return None  # belirsiz → filtre yok
 
-    # Turkish → English code term bridge for query augmentation
+    # Yalnızca Türkçe kavramlar → İngilizce karşılıkları.
+    # BM25 artık kod tanımlayıcılarını (PACKAGE_PIN, spi_mosi, AB22, CONFIG...) direkt buluyor.
+    # Bu dict sadece BM25'in bilemeyeceği Türkçe→İngilizce kavram eşlemelerini içerir.
     _TR_EN_TERMS = {
-        "çalışma modu": "operating mode DEMO_MODE",
-        "buton": "button button_pe case",
-        "varsayılan": "default init PAUSED",
-        "demo": "demo DEMO_MODE SW_TONE_GEN HW_TONE_GEN",
-        "sdk": "SDK XAxiDma XGpio helloworld firmware",
-        "yazılım": "software firmware C code function",
-        # Address map — very specific TCL terms to retrieve address segment chunks
-        "adres haritası": "address map create_bd_addr_seg SEG_GPIO_IN SEG_axi_dma offset 0x40000000 0x41E00000 dlmb ilmb mig_7series memaddr",
-        "adres": "address baseaddr BASEADDR offset 0x40 create_bd_addr_seg SEG_axi_gpio assign_bd_address",
-        "bellek haritası": "create_bd_addr_seg offset 0x40000000 0x41E00000 SEG_GPIO DDR2 MIG memmap memaddr XPAR",
-        "bellek": "memory DDR2 BRAM address XPAR create_bd_addr_seg mig_7series",
-        "gpio": "GPIO XGpio gpio_io C_GPIO_WIDTH gpio_io_o gpio_io_i",
-        "saat": "clock clk_wiz MMCM PLL CLK100MHZ create_clock clk_out1",
-        "reset": "reset rst_clk_wiz proc_sys_reset ext_reset_in dcm_locked",
-        "dma": "DMA XAxiDma SimpleTransfer MM2S S2MM",
-        # FIFO — specific to fifo2audpwm.v and design_1.tcl FIFO generator
-        "fifo": "FIFO fifo_empty fifo_full fifo_rd_en fifo2audpwm aud_en DATA_WIDTH duty count PWM",
-        "pwm": "PWM count duty DATA_WIDTH fifo2audpwm aud_pwm aud_en fifo_rd_en",
-        "kesme": "interrupt irq INTC xlconcat",
-        "axi": "AXI AXI4 S_AXI M_AXI connect_bd_net",
-        # Timing — XDC specific
-        "timing": "timing create_clock false_path multicycle set_input_delay sys_clk 10.000",
-        "zamanlama": "timing constraint create_clock sys_clk 10.000 LVCMOS33",
-        "iostandard": "IOSTANDARD LVCMOS33 LVCMOS25 LVCMOS12 LVCMOS15 set_property PACKAGE_PIN",
-        # LED/switch — for XDC retrieval
-        "led": "LED leds LVCMOS25 PACKAGE_PIN T14 set_property IOSTANDARD",
-        "switch": "switches LVCMOS12 PACKAGE_PIN E22 set_property IOSTANDARD",
-        "sentez": "synthesis synth_1 synth_design launch_runs BRAM LUTs",
-        "frekans": "frequency Hz MHz CLK INCREMENT localparam",
-        "interrupt": "interrupt irq INTC XIntc",
-        # Standalone/wrapper RTL — for axi_gpio_wrapper.v
-        "çalıştırılabilir": "standalone tied off AXI master slave s_axi_awaddr",
-        "standalone": "standalone tied off AXI master cannot operate s_axi_awaddr 32'h0 1'b0",
-        # XDC constraint file retrieval
-        "xdc": "XDC set_property PACKAGE_PIN IOSTANDARD",
-        # Configuration voltage properties (Nexys Video Master XDC)
-        "cfgbvs": "CFGBVS VCCO CONFIG_VOLTAGE set_property configuration voltage",
-        "config_voltage": "CONFIG_VOLTAGE CFGBVS VCCO set_property 3.3 current_design",
-        # Peripheral/XPAR addressing
-        "peripheral": "XPAR_GPIO_IN XPAR_GPIO_OUT XPAR_AXI_DMA XPAR_MIG7SERIES DDR_BASE_ADDR create_bd_addr_seg",
-        "offset": "offset 0x40000000 0x41E00000 0x80000000 create_bd_addr_seg SEG_GPIO SEG_axi_dma",
-        # DDR3/DDR sorguları → MIG 7series (PROJECT-A DDR2 MIG kanalı)
-        "ddr3":   "ddr2 mig_7series MIG DDR SDRAM ui_clk mem_if_ddr2",
-        "ddr":    "mig_7series DDR2 ui_clk MIG 7series mem_if_ddr2 SDRAM clock period 3077ps 650Mbps MT47H64M16HR",
-        "ddr2":   "DDR2 mig_7series MIG MT47H64M16HR clock period 3077ps 3000ps 650Mbps 667Mbps data_width",
-        "clock period": "clock period 3077ps 3000ps 650Mbps 667Mbps DDR2 MIG recommended max",
-        # IP konfigürasyon sorguları — design_1.tcl ve create_axi_simple.tcl
-        "ip conf": "CONFIG set_property ip tcl axi_gpio axi_dma microblaze clk_wiz NUM_PORTS C_GPIO_WIDTH C_BAUDRATE burst_size design_1",
-        "ip konfigür": "CONFIG set_property ip tcl axi_gpio axi_dma microblaze clk_wiz C_GPIO_WIDTH C_BAUDRATE NUM_MI NUM_SI",
-        "ip bilgi": "CONFIG set_property ip tcl axi_gpio axi_dma microblaze clk_wiz C_GPIO_WIDTH C_BAUDRATE burst_size",
-        "konfigürasyon bilgi": "CONFIG set_property ip tcl axi_gpio C_GPIO_WIDTH C_BAUDRATE NUM_MI NUM_PORTS burst_size",
-        "ip parametre": "CONFIG set_property ip axi_gpio C_GPIO_WIDTH C_IS_DUAL C_BAUDRATE C_mm2s_burst_size NUM_PORTS",
-        # MicroBlaze cache konfigürasyon sorguları
-        "c_use_icache": "CONFIG.C_USE_ICACHE C_USE_DCACHE microblaze_0 cache 1 0 config",
-        "icache": "C_USE_ICACHE C_USE_DCACHE CONFIG microblaze cache ICache DCache",
-        "cache konfig": "C_USE_ICACHE C_USE_DCACHE CONFIG.C_USE_ICACHE {1} microblaze",
-        # Ethernet PHY — Nexys A7 SMSC LAN8720A RMII 10/100
-        "ethernet": "ethernet SMSC LAN8720A RMII 10/100 Mb/s PHY RJ-45 axi_ethernetlite axi_ethernet mii_to_rmii 50MHz",
-        "phy": "PHY SMSC LAN8720A RMII ethernet 10/100 Mb/s interface RJ-45",
-        "smsc": "SMSC LAN8720A RMII 10/100 Mb/s Ethernet PHY axi_ethernetlite",
-        "rmii": "RMII mii_to_rmii SMSC 50MHz Ethernet interface reduced MII",
-        # Türkçe donanım bileşen terimleri → İngilizce karşılıkları
-        "ivmeölçer": "accelerometer ADXL362 SPI interrupt motion detection axis",
-        "ivme": "accelerometer ADXL362 SPI g-force motion axis",
-        "sıcaklık": "temperature sensor ADT7420 I2C address register MSB LSB",
-        "sıcaklık sensörü": "temperature ADT7420 I2C 0x48 register MSB LSB Critical Warning",
-        "mikrofon": "microphone PDM pulse density modulation digital interface timing",
-        "vga": "VGA video port horizontal vertical sync timing resolution RGB",
-        "ses çıkışı": "audio output mono PWM amplifier aud_pwm aud_en",
-        "ses": "audio PWM tone fifo2audpwm aud_pwm amplifier",
-        "ekran": "display seven-segment VGA LCD digit anode cathode",
-        "yedi segment": "seven-segment display digit anode cathode encoder",
-        "7 segment": "seven-segment display digit anode cathode encoder",
-        "pmod": "Pmod port connector JA JB JC JD PACKAGE_PIN set_property IOSTANDARD LVCMOS33 AB22 AB21 AB20",
-        "spi pin": "SPI PACKAGE_PIN spi_mosi spi_miso spi_sck spi_ss Pmod JA LVCMOS33 set_property IOSTANDARD",
-        "spi sinyal": "SPI spi_mosi spi_miso spi_sck spi_ss PACKAGE_PIN AB22 AB21 AB20 AB18 Pmod JA LVCMOS33",
-        "microsd": "MicroSD slot SPI SDHC card",
-        "usb uart": "USB UART serial port bridge FT2232 baud rate",
-        "seri port": "serial port UART USB FT2232 baud 115200",
+        # Türkçe donanım/yazılım kavramları
+        "saat":             "clock CLK clk_wiz MMCM PLL",
+        "bellek":           "memory DDR BRAM RAM",
+        "bellek haritası":  "address map create_bd_addr_seg offset",
+        "adres haritası":   "address map create_bd_addr_seg SEG offset",
+        "adres":            "address baseaddr offset",
+        "kesme":            "interrupt irq INTC",
+        "zamanlama":        "timing constraint create_clock",
+        "sentez":           "synthesis synth_1 synth_design",
+        "frekans":          "frequency Hz MHz localparam",
+        "yazılım":          "software firmware C code",
+        "çalışma modu":     "operating mode DEMO_MODE",
+        "buton":            "button",
+        "varsayılan":       "default init",
+        "çalıştırılabilir": "standalone AXI master",
+        # Türkçe donanım bileşen adları → İngilizce
+        "ivmeölçer":        "accelerometer ADXL362",
+        "ivme":             "accelerometer axis",
+        "sıcaklık sensörü": "temperature sensor ADT7420 I2C",
+        "sıcaklık":         "temperature sensor",
+        "mikrofon":         "microphone PDM",
+        "ses çıkışı":       "audio output PWM amplifier",
+        "ses":              "audio tone PWM",
+        "ekran":            "display seven-segment digit",
+        "yedi segment":     "seven-segment display digit anode cathode",
+        "7 segment":        "seven-segment display digit anode cathode",
+        "seri port":        "serial UART baud rate",
+        # Versiyon çapraz eşleme — BM25 biremez (DDR3 soran için DDR2 içeriği)
+        "ddr3":             "DDR2 mig_7series MIG SDRAM",
     }
 
     def _augment_query(self, question: str) -> str:
