@@ -243,7 +243,7 @@ with st.sidebar:
         ("🔗 Trace",   "axis2fifo hangi gereksinimi implement ediyor?"),
         ("💡 Why",     "MIG 7-series DDR2 kontrolcüsü neden seçildi?"),
         ("⚙️ How",     "AXI GPIO wrapper nasıl bağlanıyor?"),
-        ("🔍 What",    "PROJECT-B'deki AXI bus mimarisi nedir?"),
+        ("🔍 What",    "axi_gpio_example projesindeki AXI bus mimarisi nedir?"),
         ("⬜ Gap",     "DMA-REQ-L0-001 hangi bileşen karşılıyor?"),
     ]
 
