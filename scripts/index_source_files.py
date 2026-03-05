@@ -91,9 +91,46 @@ PROJECT_SOURCE_CATALOG = [
     {
         "project": "gtx_ddr_example",
         "display_name": "GTX DDR Example (Nexys Video)",
-        "roots": [f"{_VT}/gtx_ddr_example"],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
-        "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "roots": [
+            f"{_VT}/gtx_ddr_example",
+            str(_ROOT / "data/code/gtx_ddr_example"),
+        ],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".md"],
+        "exclude_patterns": [
+            ".git", "__pycache__", ".cache", ".gen", ".runs",
+            ".hw", ".ip_user_files", "vivado_zynq_gtx",
+            "backup", ".dmp",
+        ],
+        "specific_files": [
+            str(_ROOT / "data/code/gtx_ddr_example/vivado_zynq_gtx/zynq_gtx_ddr_project.srcs/constrs_1/new/zynq_pins.xdc"),
+        ],
+        "file_node_map": {},
+    },
+    # ── hdmi_video_example ────────────────────────────────────────────────────
+    {
+        "project": "hdmi_video_example",
+        "display_name": "HDMI Video Example (Nexys Video)",
+        "roots": [
+            str(_ROOT / "data/code/hdmi_video_example"),
+        ],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".md"],
+        "exclude_patterns": [
+            ".git", "__pycache__", ".cache", ".gen", ".runs",
+            ".hw", ".ip_user_files", "digilent_project", "vivado_zynq_video",
+            "xgui",
+        ],
+        "specific_files": [
+            # Digilent vivado-library IP XDC kısıtlamaları
+            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/src/axi_dynclk.xdc"),
+            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/dvi2rgb/src/dvi2rgb.xdc"),
+            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/rgb2dvi/src/rgb2dvi.xdc"),
+            # axi_dynclk RTL ve driver
+            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/src/mmcme2_drp.v"),
+            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/drivers/dynclk/src/ddynclk.c"),
+            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/drivers/dynclk/src/ddynclk.h"),
+            # Proje XDC kısıtlamaları
+            str(_ROOT / "data/code/hdmi_video_example/vivado_zynq_video/zynq_video_project.srcs/constrs_1/new/video_pins.xdc"),
+        ],
         "file_node_map": {},
     },
     {
