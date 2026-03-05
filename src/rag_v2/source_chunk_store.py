@@ -211,6 +211,48 @@ class SourceFileChunker:
         return "\n".join(lines) + "\n---\n"
 
     @staticmethod
+    def _pdf_section_summary(content: str, fname: str) -> str:
+        """PDF bölümündeki teknik değerleri (parça numaraları, pin'ler, gerilimler) özetle."""
+        # Part/model numbers: e.g., MT47H64M16HR-25E, LAN8720A, XC7A100T
+        parts = re.findall(r'\b[A-Z]{2,}\d+[A-Z0-9]{2,}(?:[-/]\w+)?\b', content)
+        # Pin references: "pin E3", "pins C4, D4"
+        pins_raw = re.findall(r'\bpin[s]?\s+([A-Z]\d+(?:[,\s]+[A-Z]\d+)*)', content, re.IGNORECASE)
+        # Voltage values: 1.8V, 3.3V
+        voltages = re.findall(r'\b\d+\.\d+\s*[Vv]\b', content)
+        # Frequencies: 100 MHz, 25 MHz
+        freqs = re.findall(r'\b\d+(?:\.\d+)?\s*(?:MHz|KHz|GHz|Mbps|Gbps)\b', content, re.IGNORECASE)
+        # Inline section headings (e.g., "Board Revisions", "Migrating from Nexys 4 DDR")
+        # Lines that look like mini-headings: title-case, no trailing punctuation, 3-50 chars
+        topic_re = re.compile(
+            r'(?m)^[ \t]*([A-Z][A-Za-z]+(?: [A-Za-z0-9]+){1,6})\s*$'
+        )
+        topics = [m.group(1).strip() for m in topic_re.finditer(content)
+                  if 5 < len(m.group(1)) < 50 and not m.group(1)[0].isdigit()][:4]
+
+        parts_u = list(dict.fromkeys(p for p in parts if len(p) >= 5))[:5]
+        pins_flat: list[str] = []
+        for group in pins_raw:
+            pins_flat.extend(p.strip() for p in re.split(r'[,\s]+', group) if re.match(r'^[A-Z]\d+$', p.strip()))
+        pins_flat = list(dict.fromkeys(pins_flat))[:6]
+        volt_u = list(dict.fromkeys(voltages))[:4]
+        freq_u = list(dict.fromkeys(freqs))[:4]
+
+        lines = [f"[PDF Section — {fname}]"]
+        if topics:
+            lines.append("  Topics: " + " | ".join(topics))
+        if parts_u:
+            lines.append("  Components: " + ", ".join(parts_u))
+        if pins_flat:
+            lines.append("  Pins: " + ", ".join(pins_flat))
+        if volt_u:
+            lines.append("  Voltages: " + ", ".join(volt_u))
+        if freq_u:
+            lines.append("  Frequencies: " + ", ".join(freq_u))
+        if len(lines) == 1:
+            return ""
+        return "\n".join(lines) + "\n---\n"
+
+    @staticmethod
     def _verilog_module_summary(module_name: str, content: str) -> str:
         """Verilog modülü için port/parametre özeti."""
         param_re = re.compile(r'parameter\s+(\w+)\s*=\s*(\S+)', re.IGNORECASE)
@@ -264,6 +306,8 @@ class SourceFileChunker:
             return self._chunk_tcl(content, file_path, project, related_node_ids or [])
         elif ext == ".json" and "bd" in fname.lower():
             return self._chunk_bd_json(content, file_path, project, related_node_ids or [])
+        elif ext == ".pdf":
+            return self._chunk_pdf(file_path, project, related_node_ids or [])
         elif ext in (".md", ".txt"):
             return self._chunk_text(content, file_path, ext.lstrip("."), project, related_node_ids or [])
         else:
@@ -797,6 +841,154 @@ class SourceFileChunker:
     # Markdown / Plain text — section breaks on ## headings or blank lines
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # PDF — section-based (PyMuPDF / fitz)
+    # ------------------------------------------------------------------
+
+    def _chunk_pdf(self, file_path: str, project: str, node_ids: List[str]) -> List[SourceChunk]:
+        """PDF dosyasını section başlıklarına göre chunk'lara böl."""
+        try:
+            import fitz  # PyMuPDF
+        except ImportError:
+            return []
+
+        fname = Path(file_path).stem
+
+        try:
+            doc = fitz.open(str(file_path))
+            page_blocks: list[tuple[int, str]] = []
+            for i, page in enumerate(doc):
+                txt = page.get_text("text")
+                if txt.strip():
+                    page_blocks.append((i + 1, txt))
+            doc.close()
+        except Exception:
+            return []
+
+        if not page_blocks:
+            return []
+
+        # Strip boilerplate footers/headers from each page
+        footer_re = re.compile(
+            r'(?:Copyright Digilent[^\n]*\n|Page \d+ of \d+\n|'
+            r'Other product and company names[^\n]*\n)',
+            re.IGNORECASE,
+        )
+
+        # Build one combined text with [PAGE N] markers
+        full_text = ""
+        for pnum, ptxt in page_blocks:
+            cleaned = footer_re.sub("", ptxt).strip()
+            if cleaned:
+                full_text += f"\n[PAGE {pnum}]\n{cleaned}\n"
+
+        # Section heading: lines like "1 Overview", "4.1 DDR2 Memory", "10 Pmod Ports"
+        # Require: 1-2 digit section number (max 20), title at least 2 words (5+ chars each)
+        section_re = re.compile(
+            r'(?m)^[ \t]*([1-9]|1\d|20)(?:\.\d+)*\s+([A-Z][A-Za-z]{2,}(?:[\s/\-][A-Za-z].{1,30})?)\s*$'
+        )
+
+        boundaries: list[tuple[int, str]] = []
+        for m in section_re.finditer(full_text):
+            title = f"{m.group(1)} {m.group(2).strip()}"
+            boundaries.append((m.start(), title))
+
+        if not boundaries:
+            return self._chunk_pdf_pages(page_blocks, file_path, fname, project, node_ids)
+
+        boundaries.append((len(full_text), "_end"))
+
+        chunks: list[SourceChunk] = []
+        chunk_idx = 0
+
+        # Pre-section intro text (split if too large)
+        intro = full_text[:boundaries[0][0]].strip()
+        if len(intro) > 100:
+            if len(intro) <= MAX_CHUNK_CHARS:
+                summary = self._pdf_section_summary(intro, fname)
+                chunks.append(SourceChunk(
+                    chunk_id=f"{fname}_intro",
+                    content=summary + intro,
+                    file_path=file_path, file_type="pdf",
+                    project=project, start_line=0, end_line=0,
+                    chunk_label=f"{fname}_intro",
+                    related_node_ids=node_ids,
+                ))
+            else:
+                for j, sub in enumerate(self._split_text(intro)):
+                    sub_summary = self._pdf_section_summary(sub, fname)
+                    chunks.append(SourceChunk(
+                        chunk_id=f"{fname}_intro_{j}",
+                        content=sub_summary + sub,
+                        file_path=file_path, file_type="pdf",
+                        project=project, start_line=0, end_line=0,
+                        chunk_label=f"{fname}_intro_p{j+1}",
+                        related_node_ids=node_ids,
+                    ))
+
+        for i, (pos, title) in enumerate(boundaries[:-1]):
+            next_pos = boundaries[i + 1][0]
+            sec_text = full_text[pos:next_pos].strip()
+
+            if len(sec_text) < 50:
+                continue
+
+            label = re.sub(r'[^\w\s]', '_', title)[:50]
+            summary = self._pdf_section_summary(sec_text, fname)
+
+            if len(sec_text) <= MAX_CHUNK_CHARS:
+                chunks.append(SourceChunk(
+                    chunk_id=f"{fname}_s{chunk_idx}",
+                    content=summary + sec_text,
+                    file_path=file_path, file_type="pdf",
+                    project=project, start_line=0, end_line=0,
+                    chunk_label=f"{fname}_{label}",
+                    related_node_ids=node_ids,
+                ))
+                chunk_idx += 1
+            else:
+                for j, sub in enumerate(self._split_text(sec_text)):
+                    sub_summary = self._pdf_section_summary(sub, fname)
+                    chunks.append(SourceChunk(
+                        chunk_id=f"{fname}_s{chunk_idx}_{j}",
+                        content=sub_summary + sub,
+                        file_path=file_path, file_type="pdf",
+                        project=project, start_line=0, end_line=0,
+                        chunk_label=f"{fname}_{label}_p{j+1}",
+                        related_node_ids=node_ids,
+                    ))
+                chunk_idx += 1
+
+        return chunks if chunks else self._chunk_pdf_pages(page_blocks, file_path, fname, project, node_ids)
+
+    def _chunk_pdf_pages(
+        self,
+        page_blocks: list,
+        file_path: str,
+        fname: str,
+        project: str,
+        node_ids: List[str],
+    ) -> List[SourceChunk]:
+        """PDF fallback: 2 sayfa birleştirip chunk yap."""
+        chunks: list[SourceChunk] = []
+        i = 0
+        while i < len(page_blocks):
+            batch = page_blocks[i:i + 2]
+            text = "\n".join(f"[PAGE {p}]\n{t}" for p, t in batch).strip()
+            if len(text) > 50:
+                pnum = batch[0][0]
+                summary = self._pdf_section_summary(text, fname)
+                chunks.append(SourceChunk(
+                    chunk_id=f"{fname}_p{pnum}",
+                    content=(summary + text)[:MAX_CHUNK_CHARS],
+                    file_path=file_path, file_type="pdf",
+                    project=project, start_line=pnum, end_line=batch[-1][0],
+                    chunk_label=f"{fname}_page{pnum}",
+                    related_node_ids=node_ids,
+                ))
+            i += 2
+        return chunks
+
     def _chunk_text(self, content: str, file_path: str, file_type: str,
                     project: str, node_ids: List[str]) -> List[SourceChunk]:
         if len(content) <= MAX_CHUNK_CHARS:
@@ -959,18 +1151,22 @@ class SourceChunkStore:
         return tokens
 
     def _ensure_bm25(self):
-        """BM25 index yoksa ChromaDB'den sıfırdan kur."""
-        if self._bm25 is not None:
-            return
+        """BM25 index yoksa veya ChromaDB'den farklıysa yeniden kur."""
         try:
             from rank_bm25 import BM25Okapi
         except ImportError:
             return  # rank-bm25 yüklü değilse sessizce atla
 
         col = self._get_collection()
-        if col.count() == 0:
+        db_count = col.count()
+        if db_count == 0:
             return
 
+        # Eğer BM25 zaten varsa ve chunk sayısı ChromaDB ile eşleşiyorsa atla
+        if self._bm25 is not None and len(self._bm25_ids) == db_count:
+            return
+
+        # Yeni chunk'lar eklenmiş ya da ilk kez kurulacak → sıfırdan kur
         data = col.get(include=["documents", "metadatas"])
         self._bm25_ids   = data.get("ids", [])
         self._bm25_metas = data.get("metadatas", [])
@@ -1380,6 +1576,20 @@ class SourceChunkStore:
                     "related_node_ids": node_ids,
                 })
         return results
+
+    def delete_by_filepath(self, file_path: str) -> int:
+        """
+        Belirli bir dosyaya ait tüm chunk'ları sil.
+        ChromaDB'den siler VE BM25 cache'i sıfırlar.
+        Döndürür: silinen chunk sayısı.
+        """
+        col = self._get_collection()
+        result = col.get(where={"file_path": file_path}, include=[])
+        ids = result.get("ids", [])
+        if ids:
+            col.delete(ids=ids)
+        self._invalidate_bm25()
+        return len(ids)
 
     def reset(self):
         """Koleksiyonu sil ve yeniden oluştur."""

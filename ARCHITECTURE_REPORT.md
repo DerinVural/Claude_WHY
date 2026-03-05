@@ -355,18 +355,18 @@ Parser Agent          Chunker Agent        Graph Sync Agent
 | Indexer Agent | ✅ Var | `index_source_files.py` |
 | Chunker Agent | ✅ Var | Domain-specific, C-header pinning |
 | Parser Agent | ❌ Eksik | **En kritik boşluk** |
-| Graph Sync Agent | ❌ Eksik | Parser'a bağımlı |
+| Graph Sync Agent | ❌ Eksik | Parser'a bağımlı |ARCHITECTURE_REPORT.md
 | Eval Agent | ✅ Var | İki benchmark script |
 | Gap Analysis Agent | ⚠️ Kısmi | `fix_architecture_gaps.py` sınırlı |
 
 ---
 
 ## 9. Öncelik Matrisi
-
+ARCHITECTURE_REPORT.md
 | Öncelik | İyileştirme | Beklenen Etki | Efor |
 |---------|-------------|---------------|------|
 | 🔴 1 | Parser Agent (TCL/XDC/C extraction) | Graph drift gap sınıfı kapanır | Orta |
-| 🔴 2 | Context trust sırası: source önce | Cross/Robustness +2–3p | Düşük |
+| 🔴 2 | Context trust sırası: source önce | Cross/Robustness +2–3p | Düşük |ARCHITECTURE_REPORT.md
 | 🟡 3 | Trap response template fix | Trap 0.50 → 0.80+ | Düşük |
 | 🟡 4 | CROSSREF dengeli chunk garantisi | D-tier +15p | Düşük |
 | 🟢 5 | Graph Sync Agent | Uzun vadeli sıfır bakım | Yüksek |

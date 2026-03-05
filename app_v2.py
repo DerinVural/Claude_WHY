@@ -489,15 +489,19 @@ if prompt:
         if qr.source_chunks:
             with st.expander(f"📄 Kaynak Dosya Chunk'ları ({len(qr.source_chunks)})",
                              expanded=False):
-                for ch in qr.source_chunks[:5]:
+                for ch in qr.source_chunks[:8]:
                     fp = ch.get("file_path", "")
                     label = ch.get("chunk_label", "")
                     sim = ch.get("similarity", 0)
+                    rrf = ch.get("rrf_score", 0)
                     content = ch.get("content", "")
                     ftype = ch.get("file_type", "text")
-                    st.markdown(f"`{fp.split('/')[-1]}` — **{label}** (sim={sim:.2f})")
+                    score_str = f"rrf={rrf:.4f}" if rrf else f"sim={sim:.2f}"
+                    fname = fp.split('/')[-1]
+                    icon = "📄" if ftype == "pdf" else "📝"
+                    st.markdown(f"{icon} `{fname}` — **{label}** ({score_str})")
                     lang_map = {"verilog": "verilog", "c": "c", "xdc": "tcl",
-                                "tcl": "tcl", "header": "c"}
+                                "tcl": "tcl", "header": "c", "pdf": "text"}
                     st.code(content[:600], language=lang_map.get(ftype, "text"))
 
         # Uyarılar

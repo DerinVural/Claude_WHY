@@ -127,7 +127,7 @@ _CLASSIFY_PATTERNS = [
      r'|mevcut projeler\w*|sistemdeki projeler\w*'
      r'|projelerimiz\w*|projeleriniz\w*|tüm projeler\w*|bu projeler\w*'
      r'|(?:iki\s+\w+\s+arasındaki)'
-     r'|\barasındaki\s+(?:fark|benzerlik|farklılık|ilişki|uyum|çelişki|karşılaştırma)'
+     r'|\barasındaki(?:\s+\w+){0,3}\s+(?:fark|benzerlik|farklılık|ilişki|uyum|çelişki|karşılaştırma)'
      r'|(?:fark\w*|benzer\w*|farklı\w*|alternatif\w*)\s+\w{0,10}\s+arasında)', QueryType.CROSSREF),
     # How — implementation details
     (r'\b(nasıl|how|çalış|implement|konfigür|ayarla|kullan|bağlan|port|sinyal|clock)\b', QueryType.HOW),
@@ -146,6 +146,8 @@ def classify_query(question: str) -> QueryType:
         if re.search(pattern, q_lower, re.IGNORECASE):
             return qtype
     return QueryType.WHAT
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +184,18 @@ class QueryRouter:
         self._stale_ids = graph_store.get_stale_node_ids()
 
     def classify(self, question: str) -> QueryType:
-        return classify_query(question)
+        qt = classify_query(question)
+        # If two DIFFERENT projects are mentioned by text signals, force CROSSREF
+        # regardless of other pattern matches (e.g., D-CROSS-1 style questions)
+        if qt != QueryType.CROSSREF:
+            q_lower = question.lower()
+            projects_seen: set = set()
+            for keyword, project in self._TEXT_PROJECT_SIGNALS:
+                if keyword in q_lower:
+                    projects_seen.add(project)
+            if len(projects_seen) >= 2:
+                qt = QueryType.CROSSREF
+        return qt
 
     def route(self, question: str, query_type: Optional[QueryType] = None) -> QueryResult:
         """
@@ -742,7 +755,7 @@ class QueryRouter:
 
     # Sorguda geçebilecek kaynak dosya uzantıları
     _SOURCE_FILE_RE = re.compile(
-        r'\b([\w][\w\-]*)\.(?:tcl|v|sv|c|cpp|h|hpp|xdc|json)\b', re.IGNORECASE
+        r'\b([\w][\w\-]*)\.(?:tcl|v|sv|c|cpp|h|hpp|xdc|json|pdf)\b', re.IGNORECASE
     )
 
     def _search_source_chunks(

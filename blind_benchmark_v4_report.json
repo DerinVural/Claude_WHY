@@ -1,0 +1,734 @@
+{
+  "timestamp": "2026-03-04T17:07:35.884768",
+  "version": "v4",
+  "total_score": 0.279,
+  "overall_grade": "F",
+  "elapsed_s": 113.3,
+  "n_questions": 23,
+  "categories": [
+    {
+      "category": "pdf_hw",
+      "label": "PDF HW Specs    (nexys-a7_rm.pdf donanım)",
+      "score": 0.953,
+      "grade": "A",
+      "n_questions": 5,
+      "questions": [
+        {
+          "id": "PH-01",
+          "category": "pdf_hw",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "MT47H64M16HR",
+            "128",
+            "16",
+            "1.8V",
+            "DDR2"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "MT47H64M16HR",
+            "128",
+            "16"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "Nexys A7 referans kılavuzuna göre (`nexys-a7_rm.pdf`, Bölüm 3.1 DDR2):\n\n| Parametre | Değer |\n|---|---|\n| **Part Numarası** | Micron **MT47H64M16HR-25:H** (MIG ayarı: MT47H64M16HR-25E) |\n| **Kapasite** | 1Gib = **128MiB** |\n| **Veri Yolu Genişliği** | **16-bit** (tek rank) |\n| **Besleme Voltajı** | ",
+          "ground_truth": "nexys-a7_rm.pdf s.8: MT47H64M16HR-25E, 128MiB, 16-bit, 1.8V"
+        },
+        {
+          "id": "PH-02",
+          "category": "pdf_hw",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "63,400",
+            "32,600",
+            "XC7A100T",
+            "XC7A50T",
+            "LUT",
+            "DSP",
+            "240",
+            "120"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "63,400",
+            "32,600"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "nexys-a7_rm.pdf",
+            "create_spi_with_xdc.tcl",
+            "SYNTHESIS_RESULTS.md"
+          ],
+          "query_type": "CrossRef",
+          "answer_snippet": "PDF bölümünden doğrudan aktarıyorum:\n\n**XC7A100T-1CSG324C (Nexys A7-100T)**\n- Look-up Tables (LUTs): **63,400**\n- DSP Slices: **240**\n\n**XC7A50T-1CSG324I (Nexys A7-50T)**\n- Look-up Tables (LUTs): **32,600**\n- DSP Slices: **120**\n\nKaynak: `nexys-a7_rm.pdf` — Section 15 \"Temperature sensor\" / Product ",
+          "ground_truth": "nexys-a7_rm.pdf s.2: 100T=63400 LUT/240 DSP/6 CMT, 50T=32600 LUT/120 DSP/5 CMT"
+        },
+        {
+          "id": "PH-03",
+          "category": "pdf_hw",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "ADP2118",
+            "IC22",
+            "IC17",
+            "1.0V",
+            "1.8V",
+            "3.3V",
+            "3A",
+            "0.8A"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "ADP2118",
+            "3A",
+            "0.8A"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "PDF kaynak dosyasından doğrudan yanıt:\n\n**nexys-a7_rm.pdf — Bölüm 1.1 Power Supplies (Table 1.1)**\n\n| Gerilim | Devre | Regülatör | Maks. Akım | Tipik Akım |\n|---------|-------|-----------|------------|------------|\n| **3.3V** | FPGA I/O, USB, Clocks, RAM I/O, Ethernet, SD, Sensors, Flash | **IC17: ",
+          "ground_truth": "nexys-a7_rm.pdf Table 1.1: 1.0V=IC22/ADP2118/3A, 1.8V=IC23/ADP2118/0.8A, 3.3V=IC17/ADP2118/3A"
+        },
+        {
+          "id": "PH-04",
+          "category": "pdf_hw",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.767,
+          "term_hits": [
+            "L13",
+            "K17",
+            "SPI",
+            "Flash",
+            "QSPI"
+          ],
+          "term_misses": [
+            "S25FL128S"
+          ],
+          "val_hits": [
+            "L13",
+            "K17"
+          ],
+          "val_misses": [
+            "S25FL128S"
+          ],
+          "source_chunks": 17,
+          "chunk_files": [
+            "Nexys-A7-100T-Master.xdc",
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "**Kaynak:** `nexys_a7_dma_audio/Nexys-A7-100T-Master.xdc` (satır 206-212)\n\n---\n\n### Pin Atamaları\n\n| Sinyal | PACKAGE_PIN | IOSTANDARD |\n|--------|-------------|------------|\n| `QSPI_CSN` | **L13** | LVCMOS33 |\n| `QSPI_DQ[0]` | **K17** | LVCMOS33 |\n| `QSPI_DQ[1]` | K18 | LVCMOS33 |\n| `QSPI_DQ[2]` | ",
+          "ground_truth": "nexys-a7_rm.pdf: Spansion S25FL128S; Master.xdc: QSPI_CSN=L13, QSPI_DQ[0]=K17 (SCK=E9 dedicated pin via STARTUPE2)"
+        },
+        {
+          "id": "PH-05",
+          "category": "pdf_hw",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "E3",
+            "100",
+            "MHz",
+            "bank",
+            "35",
+            "MRCC"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "E3",
+            "100",
+            "35"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "nexys-a7_rm.pdf",
+            "helloworld.c"
+          ],
+          "query_type": "How",
+          "answer_snippet": "PDF kaynağına göre doğrudan yanıt:\n\n---\n\n**Nexys A7 — 100 MHz Osilatör Pin Bilgisi**\n\n**Pin:** `E3`\n**Banka:** Bank 35\n**Clock Tipi:** MRCC (Multi-Region Clock Capable) giriş\n\n> *\"The Nexys A7 board includes a single 100 MHz crystal oscillator connected to pin E3 (E3 is a MRCC input on bank 35).\"*\n\n",
+          "ground_truth": "nexys-a7_rm.pdf s.13: 100 MHz at pin E3, bank 35 MRCC input"
+        }
+      ]
+    },
+    {
+      "category": "pdf_interfaces",
+      "label": "PDF Interfaces  (nexys-a7_rm.pdf bağlantı)",
+      "score": 0.0,
+      "grade": "F",
+      "n_questions": 4,
+      "questions": [
+        {
+          "id": "PI-01",
+          "category": "pdf_interfaces",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "FT2232HQ",
+            "C4",
+            "D4",
+            "TXD",
+            "RXD",
+            "UART"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "FT2232HQ",
+            "C4",
+            "D4"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "Nexys-A7-100T-Master.xdc",
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "nexys-a7_rm.pdf s.14: FT2232HQ, TXD=C4, RXD=D4, CTS=D3, RTS=E5"
+        },
+        {
+          "id": "PI-02",
+          "category": "pdf_interfaces",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "A3",
+            "C6",
+            "B7",
+            "B11",
+            "14",
+            "VGA_HS",
+            "VGA_R",
+            "VGA_G",
+            "VGA_B"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "A3",
+            "C6",
+            "B7",
+            "B11",
+            "14"
+          ],
+          "source_chunks": 16,
+          "chunk_files": [
+            "Nexys-A7-100T-Master.xdc",
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "Master.xdc: VGA_R[0]=A3, VGA_G[0]=C6, VGA_B[0]=B7, VGA_HS=B11, 14 sinyaller"
+        },
+        {
+          "id": "PI-03",
+          "category": "pdf_interfaces",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "PIC24FJ128",
+            "F4",
+            "B2",
+            "PS2_CLK",
+            "PS2_DAT",
+            "HID"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "PIC24FJ128",
+            "F4",
+            "B2"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "Nexys-A7-100T-Master.xdc",
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "nexys-a7_rm.pdf s.15: PIC24FJ128, PS2_CLK=F4, PS2_DAT=B2"
+        },
+        {
+          "id": "PI-04",
+          "category": "pdf_interfaces",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "C17",
+            "D18",
+            "E18",
+            "A13",
+            "AD3P",
+            "JA1",
+            "JA2",
+            "JXADC"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "C17",
+            "D18",
+            "E18",
+            "A13"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "Nexys-A7-100T-Master.xdc",
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "nexys-a7_rm.pdf s.25: JA1=C17, JA2=D18, JA3=E18, JXADC1=A13(AD3P)"
+        }
+      ]
+    },
+    {
+      "category": "pdf_timing",
+      "label": "PDF Timing      (VGA/DDR2/7-seg zamanlama)",
+      "score": 0.069,
+      "grade": "F",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "PT-01",
+          "category": "pdf_timing",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "4096",
+            "4",
+            "12",
+            "bit",
+            "renk",
+            "VGA"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "4096",
+            "4",
+            "12"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "Nexys-A7-100T-Master.xdc",
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "nexys-a7_rm.pdf s.18: 4 bit/kanal × 3 = 12 bit/piksel = 4096 renk"
+        },
+        {
+          "id": "PT-02",
+          "category": "pdf_timing",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "96",
+            "16",
+            "48",
+            "25",
+            "MHz",
+            "Tpw",
+            "front porch",
+            "back porch"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "96",
+            "16",
+            "48",
+            "25"
+          ],
+          "source_chunks": 11,
+          "chunk_files": [
+            "Nexys-A7-100T-Master.xdc",
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "How",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "nexys-a7_rm.pdf s.21: Tpw=96, front porch=16, back porch=48 clks, 25 MHz pixel clock"
+        },
+        {
+          "id": "PT-03",
+          "category": "pdf_timing",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.208,
+          "term_hits": [
+            "1"
+          ],
+          "term_misses": [
+            "45",
+            "16",
+            "ms",
+            "Hz",
+            "eight",
+            "8",
+            "segment"
+          ],
+          "val_hits": [
+            "1"
+          ],
+          "val_misses": [
+            "45",
+            "16"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "nexys-a7_rm.pdf s.24: <45Hz flicker görünür, 1-16ms tazeleme, her digit 1/8 süre"
+        }
+      ]
+    },
+    {
+      "category": "ip_config_v4",
+      "label": "IP Config v4    (design_1.tcl yeni params)",
+      "score": 0.0,
+      "grade": "F",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "IC4-01",
+          "category": "ip_config_v4",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "BANK_ROW_COLUMN",
+            "ROW_BANK_COLUMN",
+            "mig",
+            "DDR2",
+            "UserMemoryAddressMap"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "BANK_ROW_COLUMN"
+          ],
+          "source_chunks": 11,
+          "chunk_files": [
+            "design_1.tcl",
+            "nexys-a7_rm.pdf",
+            "project_info.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "design_1.tcl: write_mig_file proc: <UserMemoryAddressMap>BANK_ROW_COLUMN</UserMemoryAddressMap>"
+        },
+        {
+          "id": "IC4-02",
+          "category": "ip_config_v4",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "c_sg_length_width",
+            "24",
+            "length",
+            "transfer",
+            "axi_dma"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "24"
+          ],
+          "source_chunks": 15,
+          "chunk_files": [
+            "design_1.tcl",
+            "nexys-a7_rm.pdf",
+            "helloworld.c",
+            "Nexys-A7-100T-Master.xdc"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "design_1.tcl: CONFIG.c_sg_length_width {24} — scatter-gather transfer length bits"
+        },
+        {
+          "id": "IC4-03",
+          "category": "ip_config_v4",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "24.576",
+            "CLKOUT2",
+            "MMCM_CLKFBOUT_MULT_F",
+            "7.125",
+            "clk_wiz"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "24.576",
+            "7.125"
+          ],
+          "source_chunks": 12,
+          "chunk_files": [
+            "design_1.tcl"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "design_1.tcl: CLKOUT2_REQUESTED_OUT_FREQ={24.576}, MMCM_CLKFBOUT_MULT_F={7.125}, MMCM_DIVCLK_DIVIDE={1}"
+        }
+      ]
+    },
+    {
+      "category": "rtl_signal_v4",
+      "label": "RTL Signal v4   (tone_gen/fifo2audpwm)",
+      "score": 0.0,
+      "grade": "F",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "RS4-01",
+          "category": "rtl_signal_v4",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "packet_count",
+            "PACKET_SIZE",
+            "tlast",
+            "axis_tlast",
+            "PACKET_SIZE-1",
+            "eşit"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "packet_count",
+            "PACKET_SIZE"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "nexys-a7_rm.pdf",
+            "design_1.tcl",
+            "axis2fifo.v",
+            "helloworld.c",
+            "tone_generator.v"
+          ],
+          "query_type": "How",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "tone_generator.v: assign axis_tlast = (packet_count == PACKET_SIZE-1)"
+        },
+        {
+          "id": "RS4-02",
+          "category": "rtl_signal_v4",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "ACCUMULATOR_DEPTH",
+            "32",
+            "frekans",
+            "akümülatör",
+            "DDS"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "32"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "design_1.tcl",
+            "project_info.tcl",
+            "platform.c",
+            "helloworld.c",
+            "tone_generator.v"
+          ],
+          "query_type": "How",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "tone_generator.v: localparam ACCUMULATOR_DEPTH = 32"
+        },
+        {
+          "id": "RS4-03",
+          "category": "rtl_signal_v4",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "DATA_WIDTH",
+            "8",
+            "duty",
+            "4",
+            "9",
+            "array"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "8",
+            "4"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "design_1.tcl",
+            "axis2fifo.v",
+            "fifo2audpwm.v",
+            "helloworld.c"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "fifo2audpwm.v: DATA_WIDTH=8, duty[3:0] (4 element), duty [DATA_WIDTH:0] = [8:0] (9-bit)"
+        }
+      ]
+    },
+    {
+      "category": "cross_v4",
+      "label": "Cross v4        (proje+PDF çapraz)",
+      "score": 0.0,
+      "grade": "F",
+      "n_questions": 2,
+      "questions": [
+        {
+          "id": "CV4-01",
+          "category": "cross_v4",
+          "project": "nexys_a7_dma_audio + axi_gpio_example",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "xc7a100t",
+            "128",
+            "DDR2",
+            "MiB",
+            "nexys"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "xc7a100t",
+            "128"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "project_info.tcl: xc7a100tcsg324-1; PDF: 128MiB DDR2 MT47H64M16HR-25E"
+        },
+        {
+          "id": "CV4-02",
+          "category": "cross_v4",
+          "project": "nexys_a7_dma_audio + axi_gpio_example",
+          "type": "real",
+          "score": 0.0,
+          "term_hits": [],
+          "term_misses": [
+            "PWM",
+            "pulse",
+            "modulation",
+            "audio",
+            "tone",
+            "ses"
+          ],
+          "val_hits": [],
+          "val_misses": [
+            "PWM"
+          ],
+          "source_chunks": 10,
+          "chunk_files": [
+            "Nexys-A7-100T-Master.xdc",
+            "nexys-a7_rm.pdf",
+            "design_1.tcl",
+            "helloworld.c",
+            "tone_generator.v"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "tone_generator.v: AXI-Stream ses paketi üretir; PDF s.30: PWM audio amplifier"
+        }
+      ]
+    },
+    {
+      "category": "trap_v4",
+      "label": "Trap v4         (DDR3/VGA16bit/USB3 tuzak)",
+      "score": 0.3,
+      "grade": "F",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "TR4-01",
+          "category": "trap_v4",
+          "project": "nexys_a7_dma_audio",
+          "type": "trap",
+          "score": 0.3,
+          "verdict": "PARTIAL (genel cevap, net ret yok)",
+          "hallucination_matches": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "design_1.tcl",
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "How",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "Nexys A7'de DDR3 YOK — DDR2 (MT47H64M16HR-25E) kullanılıyor. DDR3 varlığı halüsinasyon."
+        },
+        {
+          "id": "TR4-02",
+          "category": "trap_v4",
+          "project": "nexys_a7_dma_audio",
+          "type": "trap",
+          "score": 0.3,
+          "verdict": "PARTIAL (genel cevap, net ret yok)",
+          "hallucination_matches": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "Nexys A7 VGA yalnızca 12-bit (4096 renk) destekler. 16/24-bit desteklenir denmesi halüsinasyon."
+        },
+        {
+          "id": "TR4-03",
+          "category": "trap_v4",
+          "project": "nexys_a7_dma_audio",
+          "type": "trap",
+          "score": 0.3,
+          "verdict": "PARTIAL (genel cevap, net ret yok)",
+          "hallucination_matches": [],
+          "source_chunks": 10,
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "answer_snippet": "[LLM HATA: claude --print başarısız (rc=1): (stderr boş)]",
+          "ground_truth": "Nexys A7'de USB 3.0 YOK — PIC24FJ128 üzerinden USB 2.0 HID Host var."
+        }
+      ]
+    }
+  ]
+}

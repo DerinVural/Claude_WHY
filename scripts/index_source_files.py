@@ -35,21 +35,24 @@ load_dotenv(_ROOT / ".env")
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Her proje için: project_id, kaynak dizinleri, ilgili graph node_id'leri
-# NOT: Graph'taki PROJECT-A = nexys_a7_dma_audio, PROJECT-B = axi_gpio_example
+# Proje isimleri: nexys_a7_dma_audio, axi_gpio_example
 
 _VT = str(Path.home() / "Desktop/fpga_asist_dev-master/fpga_asist_dev-master/validation_test")
 
 PROJECT_SOURCE_CATALOG = [
-    # ── PROJECT-A: Nexys A7 DMA Audio ────────────────────────────────────────
+    # ── nexys_a7_dma_audio ───────────────────────────────────────────────────
     {
         "project": "nexys_a7_dma_audio",
         "display_name": "Nexys A7 DMA Audio",
         "roots": [
             str(_ROOT / "data/code/Nexys-A7-100T-DMA-Audio"),
         ],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".json"],
+        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".json", ".pdf"],
         "exclude_patterns": [".git", "__pycache__", "node_modules", ".ip_user_files",
                               "_pycache_", "sim_", ".cache"],
+        "specific_files": [
+            str(Path.home() / "Documents/nexys-a7_rm.pdf"),
+        ],
         "file_node_map": {
             "axis2fifo.v": ["COMP-A-axis2fifo_0"],
             "fifo2audpwm.v": ["COMP-A-fifo2audpwm_0"],
@@ -61,7 +64,7 @@ PROJECT_SOURCE_CATALOG = [
             "platform.h": [],
         },
     },
-    # ── PROJECT-B: AXI GPIO Example (Nexys Video) ────────────────────────────
+    # ── axi_gpio_example ─────────────────────────────────────────────────────
     {
         "project": "axi_gpio_example",
         "display_name": "AXI GPIO Example (Nexys Video)",
