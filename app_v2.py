@@ -121,11 +121,25 @@ def load_rag_v2():
         except Exception as e:
             sc = None  # Graceful degradation
 
-    router = QueryRouter(gs, vs, source_chunk_store=sc, n_vector_results=6, n_source_results=16)
+    # ── 5. Store: DocStore (Xilinx UG/XAPP dökümanları) ──────────────────────
+    doc_store_path = str(_ROOT / "db" / "chroma_docs")
+    ds = None
+    if Path(doc_store_path).exists():
+        try:
+            from rag_v2.doc_store import DocStore
+            ds = DocStore(persist_dir="db/chroma_docs")
+            if ds.count() == 0:
+                ds = None  # Boş store — bağlama
+        except Exception:
+            ds = None  # Graceful degradation
+
+    router = QueryRouter(gs, vs, source_chunk_store=sc, doc_store=ds,
+                         n_vector_results=6, n_source_results=16)
     gate = HallucinationGate(gs)
 
     stats = gs.stats()
     stats["source_chunks"] = sc.count() if sc else 0
+    stats["doc_chunks"] = ds.count() if ds else 0
     return gs, vs, router, gate, stats, sc
 
 
@@ -273,6 +287,7 @@ with st.sidebar:
     st.metric("Graph Edges", db_stats["total_edges"])
     st.metric("Vector Docs", vs.count())
     st.metric("Source Chunks", db_stats.get("source_chunks", 0))
+    st.metric("Doc Chunks (UG)", db_stats.get("doc_chunks", 0))
     st.metric("Eşik", "0.35 / 0.25")
 
     gaps = gs.get_coverage_gaps()
@@ -386,15 +401,17 @@ if prompt:
             st.write(f"{emoji} Sorgu tipi: **{detected_qt.value}**")
 
             # Route
-            n_stores = "4" if router.source_store else "3"
+            n_stores = "5" if router.doc_store else ("4" if router.source_store else "3")
             st.write(f"📡 {n_stores} store paralel sorgulanıyor…")
             qr = router.route(prompt, detected_qt)
+            doc_count = len(getattr(qr, "doc_chunks", []))
             st.write(
                 f"Bulundu → vector: {len(qr.vector_hits)} · "
                 f"graph: {len(qr.graph_nodes)} · "
                 f"edges: {len(qr.graph_edges)} · "
                 f"req_tree: {len(qr.req_tree)} · "
-                f"source_chunks: {len(qr.source_chunks)}"
+                f"source_chunks: {len(qr.source_chunks)} · "
+                f"doc_chunks: {doc_count}"
             )
 
             # Gate
@@ -505,6 +522,22 @@ if prompt:
                     lang_map = {"verilog": "verilog", "c": "c", "xdc": "tcl",
                                 "tcl": "tcl", "header": "c", "pdf": "text"}
                     st.code(content[:600], language=lang_map.get(ftype, "text"))
+
+        # Doc Chunks (5. store — Xilinx UG)
+        doc_chunks = getattr(qr, "doc_chunks", [])
+        if doc_chunks:
+            with st.expander(f"📚 UG Döküman Chunk'ları ({len(doc_chunks)})",
+                             expanded=False):
+                for dc in doc_chunks[:4]:
+                    doc_title = dc.get("doc_title", dc.get("doc_id", ""))
+                    section = dc.get("section", "")
+                    sim = dc.get("similarity", 0)
+                    page_num = dc.get("page_num", 0)
+                    content = dc.get("content", "")
+                    page_str = f" s.{page_num}" if page_num else ""
+                    st.markdown(f"📚 **{dc.get('doc_id','?')}** — {section}{page_str} (sim={sim:.2f})")
+                    st.caption(doc_title)
+                    st.code(content[:500], language="text")
 
         # Uyarılar
         if show_warnings and gr.warnings:

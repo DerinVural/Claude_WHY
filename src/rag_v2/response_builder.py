@@ -104,6 +104,37 @@ def build_llm_context(
         lines.append("=" * 60)
         lines.append("")
 
+    # ── 1b. Xilinx UG Döküman Chunk'ları (5. store) ──────────────────────────
+    # Proje kaynak kodundan sonra gelir — referans bilgi, ground truth değil.
+    # LLM için: "Proje kaynak kodu ile çelişirse kaynak kodu tercih et."
+    if hasattr(query_result, "doc_chunks") and query_result.doc_chunks:
+        lines.append("=" * 60)
+        lines.append("=== XİLİNX REFERANS DÖKÜMANLAR (UG/XAPP) ===")
+        lines.append("(Genel Vivado/Vitis referansı. Proje kaynak koduyla çelişirse kaynak kodu tercih et.)")
+        lines.append("")
+
+        doc_budget = max(1500, int(max_chars * 0.20))
+        for dc in query_result.doc_chunks[:4]:
+            doc_title = dc.get("doc_title", dc.get("doc_id", ""))
+            section = dc.get("section", "")
+            page_num = dc.get("page_num", 0)
+            sim = dc.get("similarity", 0)
+            content = dc.get("content", "")
+
+            page_str = f"s.{page_num}" if page_num else ""
+            header = f"--- [{doc_title}] {section} {page_str} sim={sim:.2f} ---"
+            lines.append(header)
+            content_trimmed = content[:min(len(content), doc_budget - len(header) - 4)]
+            lines.append(content_trimmed)
+            lines.append("")
+
+            doc_budget -= len(content_trimmed) + len(header) + 4
+            if doc_budget <= 200:
+                break
+
+        lines.append("=" * 60)
+        lines.append("")
+
     # ── 2. SONRA: Graph Nodes (Mimari Bağlam / Topoloji) ─────────────────────
     # Graph node'ları mimari bağlamı ve bileşen ilişkilerini verir.
     # Parametre değerleri için KAYNAK DOSYA bölümünü kullan, graph'ı değil.

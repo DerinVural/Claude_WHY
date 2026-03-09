@@ -37,6 +37,13 @@ try:
 except ImportError:
     _HAS_SOURCE_STORE = False
 
+# DocStore isteğe bağlı — yoksa gracefully degrade
+try:
+    from rag_v2.doc_store import DocStore as _DS
+    _HAS_DOC_STORE = True
+except ImportError:
+    _HAS_DOC_STORE = False
+
 
 # ---------------------------------------------------------------------------
 # Query Type
@@ -56,7 +63,7 @@ class QueryType(str, Enum):
 # ---------------------------------------------------------------------------
 
 class QueryResult:
-    """Container for 4-store federated query results."""
+    """Container for 5-store federated query results."""
 
     def __init__(
         self,
@@ -66,7 +73,8 @@ class QueryResult:
         graph_nodes: List[Dict[str, Any]] = None,
         graph_edges: List[Dict[str, Any]] = None,
         req_tree: List[Dict[str, Any]] = None,
-        source_chunks: List[Dict[str, Any]] = None,   # YENİ: 4. store
+        source_chunks: List[Dict[str, Any]] = None,   # 4. store: proje kaynak kodu
+        doc_chunks: List[Dict[str, Any]] = None,       # 5. store: Xilinx UG dökümanları
         stale_ids: set = None,
     ):
         self.query = query
@@ -75,7 +83,8 @@ class QueryResult:
         self.graph_nodes = graph_nodes or []
         self.graph_edges = graph_edges or []
         self.req_tree = req_tree or []
-        self.source_chunks = source_chunks or []       # YENİ
+        self.source_chunks = source_chunks or []
+        self.doc_chunks = doc_chunks or []             # 5. store
         self.stale_ids = stale_ids or set()
 
     def all_nodes(self) -> List[Dict[str, Any]]:
@@ -102,7 +111,8 @@ class QueryResult:
                 f"graph={len(self.graph_nodes)}, "
                 f"edges={len(self.graph_edges)}, "
                 f"req_tree={len(self.req_tree)}, "
-                f"source_chunks={len(self.source_chunks)})")
+                f"source_chunks={len(self.source_chunks)}, "
+                f"doc_chunks={len(self.doc_chunks)})")
 
 
 # ---------------------------------------------------------------------------
@@ -181,13 +191,17 @@ class QueryRouter:
         graph_store: GraphStore,
         vector_store: VectorStoreV2,
         source_chunk_store=None,          # SourceChunkStore | None
+        doc_store=None,                   # DocStore | None — Xilinx UG dökümanları
         n_vector_results: int = 0,        # 0 → auto-scale ile belirlenir
         n_graph_results: int = 10,
         n_source_results: int = 0,        # 0 → auto-scale ile belirlenir
+        n_doc_results: int = 4,           # UG döküman sonuçları (sabit — çok fazla gürültü ekler)
     ):
         self.graph = graph_store
         self.vector = vector_store
         self.source_store = source_chunk_store   # None → graceful degradation
+        self.doc_store = doc_store               # None → graceful degradation
+        self.n_doc = n_doc_results
         self.n_graph = n_graph_results
         self._stale_ids = graph_store.get_stale_node_ids()
 
@@ -223,6 +237,34 @@ class QueryRouter:
                 qt = QueryType.CROSSREF
         return qt
 
+    # Doc sorgu keyword'leri — proje sinyali olmasa bile doc_store'a bak
+    _DOC_QUERY_RE = re.compile(
+        r'\b(vivado|vitis|synthesis|sentez(?:leme)?|implementation|implem'
+        r'|timing\s*constraint|timing\s*closure|set_false_path|set_multicycle'
+        r'|set_input_delay|set_output_delay|create_clock|get_clocks|get_ports'
+        r'|set_dont_touch|keep_hierarchy|xdc\s+syntax|xdc\s+komutu'
+        r'|tcl\s+komutu|tcl\s+script|ug\d{3,4}|user\s+guide'
+        r'|microblaze\s+parameter|pcw_\w+|fsbl|xsdb|bsp\s+setting'
+        r'|synthesize|elaborate|opt_design|place_design|route_design'
+        r'|direkt\w*|pragma|attribute\s+\w+|ip\s+catalog|ip\s+packager'
+        r'|clock\s+domain\s+crossing|cdc\s+violation|timing\s+violation'
+        r'|setup\s+time|hold\s+time|slack|wns|tns)\b',
+        re.IGNORECASE,
+    )
+
+    def _search_doc_store(self, question: str) -> List[Dict]:
+        """
+        DocStore araması — genel Vivado/Vitis soruları için.
+        HOW/WHAT/ENUMERATE tiplerinde ve doc keyword'leri varsa çalışır.
+        Proje-spesifik context'i bozmamak için az sayıda (n_doc) sonuç döner.
+        """
+        if not self.doc_store:
+            return []
+        try:
+            return self.doc_store.search(question, n_results=self.n_doc)
+        except Exception:
+            return []
+
     def route(self, question: str, query_type: Optional[QueryType] = None) -> QueryResult:
         """
         Main entry point. Returns QueryResult with results from all relevant stores.
@@ -231,19 +273,27 @@ class QueryRouter:
             query_type = self.classify(question)
 
         if query_type == QueryType.WHAT:
-            return self._route_what(question)
+            result = self._route_what(question)
         elif query_type == QueryType.HOW:
-            return self._route_how(question)
+            result = self._route_how(question)
         elif query_type == QueryType.WHY:
-            return self._route_why(question)
+            result = self._route_why(question)
         elif query_type == QueryType.TRACE:
-            return self._route_trace(question)
+            result = self._route_trace(question)
         elif query_type == QueryType.CROSSREF:
-            return self._route_crossref(question)
+            result = self._route_crossref(question)
         elif query_type == QueryType.ENUMERATE:
-            return self._route_enumerate(question)
+            result = self._route_enumerate(question)
         else:
-            return self._route_what(question)
+            result = self._route_what(question)
+
+        # 5. store: DocStore — HOW/WHAT/ENUMERATE + doc keyword'leri içeriyorsa
+        # WHY/TRACE/CROSSREF için doc context genellikle gereksiz
+        if query_type in (QueryType.WHAT, QueryType.HOW, QueryType.ENUMERATE) \
+                or self._DOC_QUERY_RE.search(question):
+            result.doc_chunks = self._search_doc_store(question)
+
+        return result
 
     # ------------------------------------------------------------------
     # Enumerate — "list all IPs/components" queries
