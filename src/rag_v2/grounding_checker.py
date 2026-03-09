@@ -24,10 +24,13 @@ from typing import Any, Dict, List
 # Regex patterns — sayısal / teknik değer tespiti
 # ---------------------------------------------------------------------------
 
-# Sayısal teknik değerler: "32 bit", "8 KB", "4 stage", "100 MHz" vb.
+# Sayısal teknik değerler: "32 bit", "8 KB", "4 stage" vb.
+# NOT: mhz/khz/ghz/ns/us/ms KASITLI çıkarıldı — bu değerler genellikle
+# hesaplanmış/türetilmiş (ör. 325 MHz = 650/2) ve kaynak dosyada birebir
+# geçmeyebilir. Frekans/zaman doğrulaması yanlış pozitif üretir.
 _VALUE_PATTERN = re.compile(
     r'\b(\d+(?:\.\d+)?)\s*'
-    r'(?:bit|bits|kb|mb|gb|stage|stages|ns|us|ms|mhz|khz|ghz|'
+    r'(?:bit|bits|kb|mb|gb|stage|stages|'
     r'word|words|byte|bytes|cycle|cycles|channel|channels|way|ways|'
     r'line|lines|entry|entries|tap|taps)\b',
     re.IGNORECASE,

@@ -39,6 +39,12 @@ load_dotenv(_ROOT / ".env")
 
 _VT = str(Path.home() / "Desktop/fpga_asist_dev-master/fpga_asist_dev-master/validation_test")
 
+# Tüm projeler için varsayılan uzantı listesi.
+# Yeni uzantı eklendiğinde buraya eklemek yeterli — tüm projeler otomatik kapsanır.
+# .prj: Xilinx MIG XML (DDR3/DDR2 pin + clock config). Chunker format imzasını
+#        kontrol eder; MIG XML değilse sıfır chunk → gürültü yok.
+DEFAULT_INCLUDE_EXTS = [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".prj"]
+
 PROJECT_SOURCE_CATALOG = [
     # ── nexys_a7_dma_audio ───────────────────────────────────────────────────
     {
@@ -47,7 +53,7 @@ PROJECT_SOURCE_CATALOG = [
         "roots": [
             str(_ROOT / "data/code/Nexys-A7-100T-DMA-Audio"),
         ],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".json", ".pdf"],
+        "include_exts": DEFAULT_INCLUDE_EXTS + [".json", ".pdf"],
         "exclude_patterns": [".git", "__pycache__", "node_modules", ".ip_user_files",
                               "_pycache_", "sim_", ".cache"],
         "specific_files": [
@@ -71,7 +77,7 @@ PROJECT_SOURCE_CATALOG = [
         "roots": [
             f"{_VT}/axi_example",
         ],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".json"],
+        "include_exts": DEFAULT_INCLUDE_EXTS + [".json"],
         "exclude_patterns": [".git", "__pycache__", "vivado_minimal_mb", "RUN_AXI"],
         "file_node_map": {
             "nexys_video.xdc": ["COMP-B-clk_wiz_0", "COMP-B-rst_clk_wiz_0_100M"],
@@ -95,7 +101,7 @@ PROJECT_SOURCE_CATALOG = [
             f"{_VT}/gtx_ddr_example",
             str(_ROOT / "data/code/gtx_ddr_example"),
         ],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".md"],
+        "include_exts": DEFAULT_INCLUDE_EXTS + [".md"],
         "exclude_patterns": [
             ".git", "__pycache__", ".cache", ".gen", ".runs",
             ".hw", ".ip_user_files", "vivado_zynq_gtx",
@@ -113,7 +119,7 @@ PROJECT_SOURCE_CATALOG = [
         "roots": [
             str(_ROOT / "data/code/hdmi_video_example"),
         ],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".md"],
+        "include_exts": DEFAULT_INCLUDE_EXTS + [".md"],
         "exclude_patterns": [
             ".git", "__pycache__", ".cache", ".gen", ".runs",
             ".hw", ".ip_user_files", "digilent_project", "vivado_zynq_video",
@@ -137,7 +143,7 @@ PROJECT_SOURCE_CATALOG = [
         "project": "i2c_example",
         "display_name": "I2C Example (Nexys Video)",
         "roots": [f"{_VT}/i2c_example"],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "include_exts": DEFAULT_INCLUDE_EXTS,
         "exclude_patterns": [".git", "__pycache__", ".cache"],
         "file_node_map": {},
     },
@@ -145,7 +151,7 @@ PROJECT_SOURCE_CATALOG = [
         "project": "pcie_dma_ddr_example",
         "display_name": "PCIe DMA DDR Example",
         "roots": [f"{_VT}/pcie_dma_ddr_example"],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "include_exts": DEFAULT_INCLUDE_EXTS,
         "exclude_patterns": [".git", "__pycache__", ".cache"],
         "file_node_map": {},
     },
@@ -153,7 +159,7 @@ PROJECT_SOURCE_CATALOG = [
         "project": "pcie_xdma_mb_example",
         "display_name": "PCIe XDMA MicroBlaze Example",
         "roots": [f"{_VT}/pcie_xdma_mb_example"],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "include_exts": DEFAULT_INCLUDE_EXTS,
         "exclude_patterns": [".git", "__pycache__", ".cache"],
         "file_node_map": {},
     },
@@ -161,7 +167,7 @@ PROJECT_SOURCE_CATALOG = [
         "project": "rgmii_example",
         "display_name": "RGMII Ethernet Example (Nexys Video)",
         "roots": [f"{_VT}/rgmii_example"],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "include_exts": DEFAULT_INCLUDE_EXTS,
         "exclude_patterns": [".git", "__pycache__", ".cache"],
         "file_node_map": {},
     },
@@ -169,7 +175,7 @@ PROJECT_SOURCE_CATALOG = [
         "project": "v2_mig",
         "display_name": "MIG DDR3 v2 Example",
         "roots": [f"{_VT}/v2_mig"],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "include_exts": DEFAULT_INCLUDE_EXTS,
         "exclude_patterns": [".git", "__pycache__", ".cache"],
         "file_node_map": {},
     },
@@ -177,7 +183,7 @@ PROJECT_SOURCE_CATALOG = [
         "project": "v3_gtx",
         "display_name": "GTX Transceiver v3 Example",
         "roots": [f"{_VT}/v3_gtx"],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "include_exts": DEFAULT_INCLUDE_EXTS,
         "exclude_patterns": [".git", "__pycache__", ".cache"],
         "file_node_map": {},
     },
@@ -185,7 +191,7 @@ PROJECT_SOURCE_CATALOG = [
         "project": "spi_example",
         "display_name": "SPI Pmod Example (Nexys Video)",
         "roots": [f"{_VT}/spi_example"],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "include_exts": DEFAULT_INCLUDE_EXTS,
         "exclude_patterns": [".git", "__pycache__", ".cache"],
         "file_node_map": {},
     },
@@ -193,8 +199,49 @@ PROJECT_SOURCE_CATALOG = [
         "project": "uart_example",
         "display_name": "UART Example",
         "roots": [f"{_VT}/uart_example"],
-        "include_exts": [".v", ".sv", ".c", ".h", ".xdc", ".tcl"],
+        "include_exts": DEFAULT_INCLUDE_EXTS,
         "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "file_node_map": {},
+    },
+    # ── Zybo-Z7-20-pcam-5c ───────────────────────────────────────────────────
+    {
+        "project": "zybo_z7_20_pcam_5c",
+        "display_name": "Zybo Z7-20 Pcam 5C (MIPI CSI-2 Camera + HDMI)",
+        "roots": [
+            f"{_VT}/Zybo-Z7-20-pcam-5c/src",
+            f"{_VT}/Zybo-Z7-20-pcam-5c/sdk/appsrc/pcam_vdma_hdmi",
+        ],
+        "include_exts": DEFAULT_INCLUDE_EXTS + [".vhd", ".cc", ".md"],
+        "exclude_patterns": [
+            ".git", "__pycache__", ".cache", ".gen", ".runs",
+            ".hw", ".ip_user_files", "ipshared", "platform",
+            "*stub*", "*sim_netlist*",
+        ],
+        "specific_files": [],
+        "file_node_map": {
+            "system.tcl": ["zybo_z7_20_pcam_5c"],
+            "ZyboZ7_A.xdc": ["zybo_z7_20_pcam_5c"],
+            "main.cc": ["zybo_z7_20_pcam_5c"],
+            "DVIClocking.vhd": ["zybo_z7_20_pcam_5c"],
+            "timing.xdc": ["zybo_z7_20_pcam_5c"],
+        },
+    },
+    # ── Arty-S7-25-base-rt ───────────────────────────────────────────────────
+    {
+        "project": "arty_s7_25_base_rt",
+        "display_name": "Arty S7-25 Base System (Real-time Processing)",
+        "roots": [
+            f"{_VT}/Arty-S7-25-base-rt/proj",
+            f"{_VT}/Arty-S7-25-base-rt/sdk",
+            f"{_VT}/Arty-S7-25-base-rt/src/bd/system/hw_handoff",
+            f"{_VT}/Arty-S7-25-base-rt/src/bd/system/hdl",
+        ],
+        "include_exts": DEFAULT_INCLUDE_EXTS + [".vhd"],
+        "exclude_patterns": [".git", "__pycache__", ".cache"],
+        "specific_files": [
+            f"{_VT}/Arty-S7-25-base-rt/src/constraints/Arty-S7-25-Master.xdc",
+            f"{_VT}/Arty-S7-25-base-rt/src/bd/system/ip/system_mig_7series_0_0/system_mig_7series_0_0/mig.prj",
+        ],
         "file_node_map": {},
     },
 ]

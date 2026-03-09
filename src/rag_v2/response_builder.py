@@ -272,20 +272,10 @@ def build_structured_response(
 # System prompt for Gemini
 # ---------------------------------------------------------------------------
 
-FPGA_RAG_SYSTEM_PROMPT = """Sen deneyimli bir FPGA mühendislik danışmanısın.
+_FPGA_RAG_SYSTEM_PROMPT_TEMPLATE = """Sen deneyimli bir FPGA mühendislik danışmanısın.
 
 Sana verilen context, farklı gerçek FPGA projelerinin kaynak dosyalarından ve mimari bilgilerinden oluşan bir REFERANS KÜTÜPHANESİDİR. Bu projeler:
-  - nexys_a7_dma_audio   : MicroBlaze + AXI DMA + DDR2 + PWM Ses sistemi (Nexys A7-100T)
-  - axi_gpio_example     : MicroBlaze + AXI GPIO temel sistemi (Nexys Video)
-  - gtx_ddr_example      : GTX Transceiver + DDR3 + MicroBlaze
-  - i2c_example          : I2C (IIC) peripheral sistemi
-  - pcie_dma_ddr_example : PCIe XDMA + DDR3 yüksek bant genişliği sistemi
-  - pcie_xdma_mb_example : PCIe XDMA + MicroBlaze hibrit mimarisi
-  - rgmii_example        : RGMII Ethernet MAC sistemi
-  - spi_example          : SPI peripheral sistemi
-  - uart_example         : UART + interrupt zinciri
-  - v2_mig               : MicroBlaze + DMA + DDR3 MIG
-  - v3_gtx               : MicroBlaze + DMA + MIG + GTX kombine sistem
+{project_list}
 
 GÖREVIN:
 Kullanıcı bir FPGA implementasyon sorusu sorduğunda:
@@ -304,12 +294,13 @@ KURALLAR — DEĞİŞMEYEN:
 3. ÖNCELİK: Kaynak dosyadaki değer > Graph metadata değeri. Çakışma varsa kaynak dosyayı kullan.
 4. Her iddia için kaynak belirt: proje adı + dosya adı (ör. nexys_a7_dma_audio/design_1.tcl).
 5. Bir parametre context'te yoksa "bu değer referans projelerde bulunmadı" de — uydurma.
-6. Coverage Gap uyarısı: "bu konuda referans projelerde bilgi bulunamadı" de.
+6. Coverage Gap uyarısı graph düzeyinde eksiklik işaretidir. Kaynak dosya chunk'ında değer açıkça yazıyorsa Coverage Gap uyarısına rağmen değeri ver — kaynak dosya her zaman önceliklidir.
 7. CONTRADICTS uyarısı varsa iki yaklaşımı da göster, kullanıcı durumuna göre öner.
 8. Yanıtı Türkçe ver. Teknik terimler (sinyal adları, parametre adları, IP adları) orijinal kalır.
 9. Proje listesi soruları: node_type=PROJECT olan nodeları listele, COMPONENT/REQUIREMENT gösterme.
-10. RTL parametresi context'te yoksa: "kaynak dosyalarda belirtilmemiş" de, localparam/parameter değerlerini doğrudan aktar.
+10. localparam/parameter/define değerlerini kaynak dosyadan doğrudan aktar. Değer chunk'ta açıkça yazıyorsa ver.
 11. Bilinmeyen arayüz/protokol: Context'te yoksa "bu arayüz referans projelerde kullanılmıyor" de.
+12. IP bloğunun parametre değeri (örn. NUM_PORTS=5, C_NUM_CHANNELS=8, CONFIG.xx=yy) chunk'ta doğrudan yazıyorsa kesinlikle ver — "belirleyemiyorum" deme.
 
 CONTEXT:
 {context}
@@ -317,3 +308,109 @@ CONTEXT:
 SORU: {question}
 
 YANIT:"""
+
+# Statik fallback — graph yüklenemezse kullanılır
+_STATIC_PROJECT_LIST = (
+    "  - nexys_a7_dma_audio   : MicroBlaze + AXI DMA + DDR2 + PWM Ses sistemi (Nexys A7-100T)\n"
+    "  - axi_gpio_example     : MicroBlaze + AXI GPIO temel sistemi (Nexys Video)\n"
+    "  - gtx_ddr_example      : GTX Transceiver + DDR3 + MicroBlaze (Nexys Video)\n"
+    "  - hdmi_video_example   : AXI VDMA + DDR3 + Video Timing + MicroBlaze (Nexys Video)\n"
+    "  - i2c_example          : I2C (IIC) peripheral sistemi (Nexys Video)\n"
+    "  - pcie_dma_ddr_example : PCIe XDMA + DDR3 yüksek bant genişliği sistemi (Nexys Video)\n"
+    "  - pcie_xdma_mb_example : PCIe XDMA + MicroBlaze hibrit mimarisi (Nexys Video)\n"
+    "  - rgmii_example        : RGMII Ethernet MAC sistemi (Nexys Video)\n"
+    "  - spi_example          : SPI peripheral sistemi (Nexys Video)\n"
+    "  - uart_example         : UART + interrupt zinciri (Nexys Video)\n"
+    "  - v2_mig               : MicroBlaze + DMA + DDR3 MIG (Nexys Video)\n"
+    "  - v3_gtx               : MicroBlaze + DMA + MIG + GTX kombine sistem (Nexys Video)\n"
+    "  - arty_s7_25_base_rt   : FreeRTOS gerçek zamanlı temel sistem, MicroBlaze + DDR3 MIG + XADC + SPI (Arty S7-25)"
+)
+
+
+def build_project_list_str(graph_store=None, source_chunk_store=None) -> str:
+    """
+    Tüm kaynaklardan dinamik proje listesi üret:
+      1. GraphStore PROJECT node'ları: tam meta (board, description) ile
+      2. SourceChunkStore projesi (grafta yoksa): chunk'lardan proje ID'si ile
+      3. Statik fallback: graph_store=None veya boş grafta
+
+    100+ proje için otomatik ölçeklenir — hardcoded liste güncellemeye gerek yok.
+    """
+    # ── Graftan PROJECT node'ları ────────────────────────────────────────────
+    graph_projects: Dict[str, str] = {}   # node_id → formatted line
+    if graph_store is not None:
+        try:
+            nodes = [n for n in graph_store.get_all_nodes() if n.get("node_type") == "PROJECT"]
+            for n in sorted(nodes, key=lambda x: x.get("node_id", "")):
+                nid   = n.get("node_id", "?")
+                name  = n.get("name", "")
+                board = n.get("board", "")
+                desc  = n.get("description", "")
+                summary = name if name else (desc[:60] if desc else nid)
+                detail  = f" ({board})" if board else ""
+                graph_projects[nid] = f"  - {nid:<25}: {summary}{detail}"
+        except Exception:
+            pass
+
+    # ── SourceChunkStore projelerini ekle (grafta yoksa) ─────────────────────
+    chunk_only_projects: list = []
+    if source_chunk_store is not None:
+        try:
+            col = source_chunk_store._get_collection()
+            data = col.get(include=["metadatas"])
+            for m in (data.get("metadatas") or []):
+                pid = m.get("project", "")
+                if pid and pid not in graph_projects:
+                    chunk_only_projects.append(pid)
+        except Exception:
+            pass
+
+    if not graph_projects and not chunk_only_projects:
+        return _STATIC_PROJECT_LIST
+
+    lines = list(graph_projects.values())
+    for pid in sorted(set(chunk_only_projects)):
+        lines.append(f"  - {pid:<25}: (kaynak dosyalar indeksli)")
+    return "\n".join(lines)
+
+
+def build_system_prompt(context: str, question: str, graph_store=None) -> str:
+    """
+    Sistem promptunu dinamik proje listesiyle oluştur.
+    graph_store verilirse PROJECT node'larından proje listesi çekilir.
+    100+ proje eklendikçe prompt otomatik güncellenir.
+    """
+    project_list = build_project_list_str(graph_store)
+    return _FPGA_RAG_SYSTEM_PROMPT_TEMPLATE.format(
+        project_list=project_list,
+        context=context,
+        question=question,
+    )
+
+
+def build_system_prefix(graph_store=None, source_chunk_store=None) -> str:
+    """
+    LLM çağrıları için dinamik sistem prefix'i döner.
+    app_v2.py ve test script'lerindeki `.split("CONTEXT:")[0].strip()` idiomunu
+    graph_store + source_chunk_store destekli hale getirir.
+
+    Kullanım (app_v2.py'de):
+        from rag_v2.response_builder import build_system_prefix
+        system = build_system_prefix(gs, source_chunk_store=sc)
+    """
+    project_list = build_project_list_str(graph_store, source_chunk_store)
+    full = _FPGA_RAG_SYSTEM_PROMPT_TEMPLATE.format(
+        project_list=project_list,
+        context="",
+        question="",
+    )
+    return full.split("CONTEXT:")[0].strip()
+
+
+# Backward compat: eski kod FPGA_RAG_SYSTEM_PROMPT string'ini doğrudan format() ile kullanır.
+# Yeni kod build_system_prompt() / build_system_prefix() kullanmalı; bu alias eski çağrıları bozmaz.
+FPGA_RAG_SYSTEM_PROMPT = _FPGA_RAG_SYSTEM_PROMPT_TEMPLATE.format(
+    project_list=_STATIC_PROJECT_LIST,
+    context="{context}",
+    question="{question}",
+)

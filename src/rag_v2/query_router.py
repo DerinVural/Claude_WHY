@@ -48,6 +48,7 @@ class QueryType(str, Enum):
     WHY = "Why"
     TRACE = "Trace"
     CROSSREF = "CrossRef"
+    ENUMERATE = "Enumerate"
 
 
 # ---------------------------------------------------------------------------
@@ -129,6 +130,15 @@ _CLASSIFY_PATTERNS = [
      r'|(?:iki\s+\w+\s+arasındaki)'
      r'|\barasındaki(?:\s+\w+){0,3}\s+(?:fark|benzerlik|farklılık|ilişki|uyum|çelişki|karşılaştırma)'
      r'|(?:fark\w*|benzer\w*|farklı\w*|alternatif\w*)\s+\w{0,10}\s+arasında)', QueryType.CROSSREF),
+    # Enumerate — "list all" / "tüm X" sorgular: top-K değil tam liste gerekir
+    # IP blokları, bileşenler, peripheral listesi, "hangi X'ler var" sorguları
+    (r'\b(tüm\s+ip\w*|ip\s+list\w*|listele\w*\s+ip\w*|ip\w*\s+listele\w*'
+     r'|hangi\s+ip\w*|kaç\s+ip\w*|all\s+ip\w*|list\s+all\s+ip'
+     r'|tüm\s+bileşen\w*|bileşen\s+list\w*|component\s+list|list\s+all\s+component'
+     r'|ip\s+blok\w*|ip\s+block\w*|kullanılan\s+ip\w*|ip\w*\s+kullanıl\w*'
+     r'|hangi\s+modul\w*|tüm\s+modul\w*|modul\s+list\w*'
+     r'|hangi\s+peripheral\w*|tüm\s+peripheral\w*|peripheral\s+list\w*)\b',
+     QueryType.ENUMERATE),
     # How — implementation details
     (r'\b(nasıl|how|çalış|implement|konfigür|ayarla|kullan|bağlan|port|sinyal|clock)\b', QueryType.HOW),
     # What — fallback
@@ -171,17 +181,33 @@ class QueryRouter:
         graph_store: GraphStore,
         vector_store: VectorStoreV2,
         source_chunk_store=None,          # SourceChunkStore | None
-        n_vector_results: int = 5,
+        n_vector_results: int = 0,        # 0 → auto-scale ile belirlenir
         n_graph_results: int = 10,
-        n_source_results: int = 4,        # kaynak chunk sayısı
+        n_source_results: int = 0,        # 0 → auto-scale ile belirlenir
     ):
         self.graph = graph_store
         self.vector = vector_store
         self.source_store = source_chunk_store   # None → graceful degradation
-        self.n_vector = n_vector_results
         self.n_graph = n_graph_results
-        self.n_source = n_source_results
         self._stale_ids = graph_store.get_stale_node_ids()
+
+        # ── Adaptif K değerleri: proje sayısına göre otomatik ölçekle ──────────
+        # 100+ proje eklendiğinde, daha geniş candidate pool gerekir.
+        # Nihai LLM context max_nodes=10 + max_chars=8000 ile sınırlıdır,
+        # bu yüzden büyük K sadece retrieval kalitesini artırır, token maliyeti sabit.
+        project_count = max(1, sum(
+            1 for n in graph_store.get_all_nodes()
+            if n.get("node_type") == "PROJECT"
+        ))
+        self.n_vector = n_vector_results if n_vector_results > 0 else max(5, min(project_count + 4, 20))
+        self.n_source = n_source_results if n_source_results > 0 else max(6, min(project_count + 2, 24))
+
+        # ── Dinamik proje sinyal tablosu ──────────────────────────────────────
+        # Sınıf değişkeni _TEXT_PROJECT_SIGNALS statik (hardcoded) girişler içerir.
+        # Grafta yeni PROJECT node'ları eklendiğinde otomatik olarak kapsanır.
+        # Yeni projeler için gereken tek şey GraphStore'a node eklemektir —
+        # index_source_files.py'ye veya query_router.py'ye dokunmak gerekmez.
+        self._TEXT_PROJECT_SIGNALS = self._build_dynamic_signals()
 
     def classify(self, question: str) -> QueryType:
         qt = classify_query(question)
@@ -214,8 +240,94 @@ class QueryRouter:
             return self._route_trace(question)
         elif query_type == QueryType.CROSSREF:
             return self._route_crossref(question)
+        elif query_type == QueryType.ENUMERATE:
+            return self._route_enumerate(question)
         else:
             return self._route_what(question)
+
+    # ------------------------------------------------------------------
+    # Enumerate — "list all IPs/components" queries
+    # top-K similarity yerine proje manifest + semantic detay
+    # ------------------------------------------------------------------
+
+    # chunk_label'lar bu listedeyse IP değil — manifest'ten çıkar
+    _ENUMERATE_SKIP_LABELS = {
+        "preamble", "address_map", "net_connections", "get_script_folder",
+        "write_mig_file_system_mig_7series_0_0", "ip_manifest",
+    }
+    _ENUMERATE_SKIP_PREFIXES = (
+        "lines ", "write_mig_file", "get_script", " (part ", "create_hier_cell_",
+        "create_root_design", "preamble",
+    )
+    _ENUMERATE_SKIP_SUFFIXES = (" (header)", " (part 1)", " (part 2)", " (part 3)")
+
+    def _route_enumerate(self, question: str) -> QueryResult:
+        """
+        ENUMERATE — "tüm IP'leri listele" tarzı sorgular.
+        1. Proje manifest: tüm TCL chunk label'larından IP listesi üret (içerik yok, sadece isimler).
+        2. Semantic detay: normal top-K search ile konfigürasyon chunk'ları.
+        LLM hem tam listeyi hem de detayları görür.
+        """
+        vector_hits = self.vector.query(question, n_results=self.n_vector)
+        vector_hits = [h for h in vector_hits if h["node_id"] not in self._stale_ids]
+        graph_nodes = self._enrich_from_graph(vector_hits)
+
+        project = self._resolve_project(question, vector_hits)
+        graph_nodes = self._filter_cross_project_nodes(graph_nodes, project)
+
+        # ── 1. Manifest ────────────────────────────────────────────────
+        manifest_chunk: Optional[Dict] = None
+        if project and self.source_store:
+            metas = self.source_store.enumerate_project_chunks(project, file_types=["tcl"])
+            ip_labels = sorted({
+                m.get("chunk_label", "")
+                for m in metas
+                if m.get("chunk_label", "") not in self._ENUMERATE_SKIP_LABELS
+                and not any(m.get("chunk_label", "").startswith(p)
+                            for p in self._ENUMERATE_SKIP_PREFIXES)
+                and not any(m.get("chunk_label", "").endswith(s)
+                            for s in self._ENUMERATE_SKIP_SUFFIXES)
+                and m.get("chunk_label", "")
+            })
+            if ip_labels:
+                manifest_content = (
+                    f"[IP Manifest — {project}]\n"
+                    f"Bu projede {len(ip_labels)} IP/bileşen tespit edildi:\n"
+                    + ", ".join(ip_labels) + "\n"
+                    f"\n(Detay için aşağıdaki IP konfigürasyon chunk'larına bakın.)"
+                )
+                manifest_chunk = {
+                    "chunk_id":        f"{project}_ip_manifest",
+                    "content":         manifest_content,
+                    "file_path":       "",
+                    "file_type":       "tcl",
+                    "project":         project,
+                    "start_line":      0,
+                    "end_line":        0,
+                    "chunk_label":     "ip_manifest",
+                    "similarity":      1.0,
+                    "rrf_score":       1.0,
+                    "related_node_ids": [],
+                }
+
+        # ── 2. Semantic detay ───────────────────────────────────────────
+        source_chunks = self._search_source_chunks(question, project_filter=project)
+        if manifest_chunk:
+            # Manifest her zaman ilk sıraya
+            source_chunks = [manifest_chunk] + [
+                c for c in source_chunks if c["chunk_id"] != manifest_chunk["chunk_id"]
+            ]
+
+        return QueryResult(
+            query=question,
+            query_type=QueryType.ENUMERATE,
+            vector_hits=vector_hits,
+            graph_nodes=graph_nodes,
+            graph_edges=[],
+            req_tree=[],
+            source_chunks=source_chunks,
+            stale_ids=self._stale_ids,
+        )
 
     # ------------------------------------------------------------------
     # What — all stores parallel
@@ -292,6 +404,7 @@ class QueryRouter:
                             graph_nodes.append({"node_id": nbr_id, **nbr_node})
 
         project = self._resolve_project(question, vector_hits)
+        graph_nodes = self._filter_cross_project_nodes(graph_nodes, project)
         source_chunks = self._search_source_chunks(question, project_filter=project)
 
         return QueryResult(
@@ -332,6 +445,7 @@ class QueryRouter:
                 pattern_edges.append({"from": nid, "to": nbr_id, **eattrs})
 
         project = self._resolve_project(question, vector_hits)
+        graph_nodes = self._filter_cross_project_nodes(graph_nodes, project)
         source_chunks = self._search_source_chunks(question, project_filter=project)
 
         return QueryResult(
@@ -379,6 +493,7 @@ class QueryRouter:
                 evidence_nodes.append({"node_id": edge["to"], **ev_node})
 
         project = self._resolve_project(question, vector_hits)
+        graph_nodes = self._filter_cross_project_nodes(graph_nodes, project)
         source_chunks = self._search_source_chunks(question, project_filter=project)
 
         return QueryResult(
@@ -457,13 +572,14 @@ class QueryRouter:
         req_tree = self._get_req_trees_for_nodes(list(visited_nodes.values()))
 
         project = self._resolve_project(question, vector_hits)
+        trace_nodes = self._filter_cross_project_nodes(list(visited_nodes.values()), project)
         source_chunks = self._search_source_chunks(question, project_filter=project)
 
         return QueryResult(
             query=question,
             query_type=QueryType.TRACE,
             vector_hits=vector_hits,
-            graph_nodes=list(visited_nodes.values()),
+            graph_nodes=trace_nodes,
             graph_edges=trace_edges,
             req_tree=req_tree,
             source_chunks=source_chunks,
@@ -585,7 +701,7 @@ class QueryRouter:
         ("nexys video hdmi", "hdmi_video_example"),
         ("nexys video", "axi_gpio_example"),
         ("axi_gpio_example", "axi_gpio_example"),
-        ("gpio_example", "axi_gpio_example"),   # "xi_gpio_example" typo da yakalar
+        ("gpio_example", "axi_gpio_example"),
         ("axi_gpio_wrapper", "axi_gpio_example"),
         ("lvcmos25", "axi_gpio_example"),
         ("lvcmos12", "axi_gpio_example"),
@@ -597,7 +713,6 @@ class QueryRouter:
         ("gtx transceiver", "gtx_ddr_example"),
         ("create_gtx_ddr", "gtx_ddr_example"),
         ("create_mb_dma_ddr3", "gtx_ddr_example"),
-        ("nexys video gtx", "gtx_ddr_example"),
         ("8b10b", "gtx_ddr_example"),
         # hdmi_video_example
         ("hdmi_video_example", "hdmi_video_example"),
@@ -642,7 +757,116 @@ class QueryRouter:
         # v3_gtx
         ("v3_gtx", "v3_gtx"),
         ("mb_dma_mig_gtx", "v3_gtx"),
+        # arty_s7_25_base_rt
+        ("arty_s7_25_base_rt", "arty_s7_25_base_rt"),
+        ("arty s7", "arty_s7_25_base_rt"),
+        ("arty-s7", "arty_s7_25_base_rt"),
+        ("arty s7-25", "arty_s7_25_base_rt"),
+        ("arty s7 25", "arty_s7_25_base_rt"),
+        ("base-rt", "arty_s7_25_base_rt"),
+        ("base_rt", "arty_s7_25_base_rt"),
+        ("freertos hello", "arty_s7_25_base_rt"),
+        ("freertos_hello", "arty_s7_25_base_rt"),
+        ("xc7s25", "arty_s7_25_base_rt"),
+        ("spartan-7", "arty_s7_25_base_rt"),
+        ("spartan 7", "arty_s7_25_base_rt"),
+        # zybo_z7_20_pcam_5c
+        ("zybo_z7_20_pcam_5c", "zybo_z7_20_pcam_5c"),
+        ("zybo z7", "zybo_z7_20_pcam_5c"),
+        ("zybo-z7", "zybo_z7_20_pcam_5c"),
+        ("pcam 5c", "zybo_z7_20_pcam_5c"),
+        ("pcam_5c", "zybo_z7_20_pcam_5c"),
+        ("pcam5c", "zybo_z7_20_pcam_5c"),
+        ("ov5640", "zybo_z7_20_pcam_5c"),
+        ("mipi csi", "zybo_z7_20_pcam_5c"),
+        ("mipi_csi", "zybo_z7_20_pcam_5c"),
+        ("mipi csi-2", "zybo_z7_20_pcam_5c"),
+        ("mipi_d_phy", "zybo_z7_20_pcam_5c"),
+        ("dphy", "zybo_z7_20_pcam_5c"),
+        ("d-phy", "zybo_z7_20_pcam_5c"),
+        ("xc7z020", "zybo_z7_20_pcam_5c"),
+        ("zynq-7000", "zybo_z7_20_pcam_5c"),
+        ("zynq 7000", "zybo_z7_20_pcam_5c"),
+        ("processing_system7", "zybo_z7_20_pcam_5c"),
+        ("AXI_BayerToRGB", "zybo_z7_20_pcam_5c"),
+        ("bayertorgb", "zybo_z7_20_pcam_5c"),
+        ("gammacorrection", "zybo_z7_20_pcam_5c"),
+        ("dviclocking", "zybo_z7_20_pcam_5c"),
+        ("dviclock", "zybo_z7_20_pcam_5c"),
+        ("pcam_vdma_hdmi", "zybo_z7_20_pcam_5c"),
     ]
+
+    def _build_dynamic_signals(self) -> List[tuple]:
+        """
+        Graf'taki PROJECT node'larından dinamik (keyword, project_id) çiftleri üret.
+        Statik _TEXT_PROJECT_SIGNALS ile birleştirir:
+          - Graf node'larından: project_id itself + board name + fpga_part kısaltması
+          - Statik listeden: spesifik IP/bileşen isimleri (aurora_8b10b, dvi2rgb, vb.)
+
+        100+ proje için: yeni proje GraphStore'a eklenince otomatik kapsanır,
+        bu dosyada güncelleme gerekmez.
+        """
+        dynamic: List[tuple] = []
+        seen_keywords: set = set()
+
+        for node in self.graph.get_all_nodes():
+            if node.get("node_type") != "PROJECT":
+                continue
+            pid = node.get("node_id", "")
+            if not pid:
+                continue
+
+            # project_id: hem altçizgili hem boşluklu form
+            for kw in (pid, pid.replace("_", " "), pid.replace("_", "-")):
+                kw = kw.strip().lower()
+                if kw and kw not in seen_keywords:
+                    seen_keywords.add(kw)
+                    dynamic.append((kw, pid))
+
+            # board adı
+            board = (node.get("board", "") or "").strip().lower()
+            if board and board not in seen_keywords:
+                seen_keywords.add(board)
+                dynamic.append((board, pid))
+
+            # fpga_part ilk kısmı (xc7s25csga324-1 → xc7s25)
+            fpga_part = (node.get("fpga_part", "") or "").strip().lower()
+            if fpga_part:
+                short = fpga_part.split("-")[0]  # xc7s25csga324 → xc7s25csga324 (no split) or xc7a100t
+                # Sadece 6+ karakter olan unique kısmı ekle
+                if len(short) >= 6 and short not in seen_keywords:
+                    seen_keywords.add(short)
+                    dynamic.append((short, pid))
+
+        # Statik girişler: spesifik IP isimlerini (aurora_8b10b vb.) kapsıyor.
+        # Çakışmayan statik girişleri sonuna ekle (daha düşük öncelik olsun).
+        static_existing = {kw for kw, _ in dynamic}
+        for kw, proj in self.__class__._TEXT_PROJECT_SIGNALS:
+            if kw not in static_existing:
+                dynamic.append((kw, proj))
+
+        return dynamic
+
+    def _build_project_tag_map(self) -> Dict[str, str]:
+        """
+        Graph node_id prefix/tag → project_id eşlemesi.
+        _infer_project() için kullanılır.
+        Yeni projeler için COMP-{yeni_proje_tag}-* gibi node'lar varsa otomatik kapsanır.
+        """
+        tag_map: Dict[str, str] = {}
+        for node in self.graph.get_all_nodes():
+            if node.get("node_type") != "PROJECT":
+                continue
+            pid = node.get("node_id", "")
+            # Eski convention: PROJECT-A → tag "A", COMP-A-* → A
+            # Yeni convention: PROJECT node_id = proje adı, COMP node_id = COMP-{pid}-*
+            # Her ikisini de map'e ekle
+            tag_map[pid] = pid
+            # Kısa tag (geriye dönük uyum: A → nexys_a7_dma_audio)
+        # Hard-coded geriye dönük uyum
+        tag_map.setdefault("A", "nexys_a7_dma_audio")
+        tag_map.setdefault("B", "axi_gpio_example")
+        return tag_map
 
     # Tüm projeler birlikte sorulduğunda → None (global arama, filtre yok)
     _ALL_PROJECTS_RE = re.compile(
@@ -687,11 +911,20 @@ class QueryRouter:
         """
         Vector hit node_id'lerinden proje adını tahmin et.
         Node ID convention:
-          - COMP-{proj_tag}-* → proje
-          - DMA-* → nexys_a7_dma_audio
+          - COMP-{proj_tag}-* → proje (dinamik tag map ile)
+          - PROJECT-{proj_id} → doğrudan proje adı
+          - DMA-* → nexys_a7_dma_audio (legacy)
           - SDOC/EVID/PAT → güvenilmez, atla
         70%+ oy → o proje; aksi halde None (global arama).
+
+        100+ proje için: _build_project_tag_map() ile dinamik; hardcoded map yok.
         """
+        # Dinamik tag map: graph PROJECT node'larından build edilir
+        tag_map = self._build_project_tag_map()
+
+        # Tüm mevcut proje ID'leri (PROJECT node isimlerinden)
+        all_project_ids: set = set(tag_map.values())
+
         votes: Dict[str, int] = {}
         for hit in vector_hits:
             nid = hit.get("node_id", "")
@@ -701,16 +934,17 @@ class QueryRouter:
             if prefix == "DMA":
                 votes["nexys_a7_dma_audio"] = votes.get("nexys_a7_dma_audio", 0) + 1
                 continue
-            # COMP-{tag}-* veya PROJECT-{tag} → tag'den proje adı
+            # PROJECT node'unun kendisi → node_id = proje adı (yeni convention)
+            if nid in all_project_ids:
+                votes[nid] = votes.get(nid, 0) + 2  # Direkt eşleşme → 2 oy
+                continue
+            # COMP-{tag}-* → tag'den proje
             if nid.startswith("COMP-") and nid.count("-") >= 2:
                 tag = nid.split("-")[1]
-                proj = {
-                    "A": "nexys_a7_dma_audio",
-                    "B": "axi_gpio_example",
-                }.get(tag)
+                proj = tag_map.get(tag)
                 if proj:
                     votes[proj] = votes.get(proj, 0) + 1
-            # Legacy fallback
+            # Legacy: REQ-A, CONST-B vb.
             elif "-A-" in nid or nid.startswith("REQ-A") or nid.startswith("CONST-A"):
                 votes["nexys_a7_dma_audio"] = votes.get("nexys_a7_dma_audio", 0) + 1
             elif "-B-" in nid or nid.startswith("REQ-B") or nid.startswith("CONST-B"):
@@ -851,6 +1085,28 @@ class QueryRouter:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _filter_cross_project_nodes(
+        self,
+        graph_nodes: List[Dict],
+        project: Optional[str],
+    ) -> List[Dict]:
+        """
+        Belirlenen proje dışındaki PROJECT node'larını kaldır.
+        COMPONENT/REQUIREMENT gibi non-PROJECT node'lar dokunulmaz
+        (bu node'larda project field'ı genellikle yok).
+        CROSSREF sorgularında ÇAĞRILMAMALI — cross-project bilgi kasıtlı isteniyor.
+        """
+        if not project:
+            return graph_nodes
+        result = []
+        for n in graph_nodes:
+            ntype = n.get("node_type", "")
+            nid = n.get("node_id", "")
+            if ntype == "PROJECT" and nid != project:
+                continue  # başka proje node'u — çıkar
+            result.append(n)
+        return result
 
     def _enrich_from_graph(self, vector_hits: List[Dict]) -> List[Dict]:
         """Fetch full node attrs from GraphStore for each vector hit."""

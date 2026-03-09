@@ -107,33 +107,66 @@ class SourceFileChunker:
         Desteklenen formatlar:
           A) set_property -dict {PACKAGE_PIN X IOSTANDARD Y} [get_ports {sig}]
           B) set_property PACKAGE_PIN X [get_ports {sig}]   (ayrı satır)
+
+        Yorum farkındalığı: aktif vs yorumlu (#) satır sayısı header'a eklenir.
+        LLM yorumlu constraint'leri aktif olarak raporlamaz.
         """
+        # ── Aktif vs yorumlu satır sayımı ─────────────────────────────
+        active_constraints = 0
+        commented_constraints = 0
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith('#') and 'set_property' in stripped.lower():
+                commented_constraints += 1
+            elif stripped.startswith('set_property') or stripped.startswith('create_clock'):
+                active_constraints += 1
+
         entries: dict[str, tuple[str, str]] = {}
 
-        # Format A — tek satır dict form
+        # Format A — aktif satırlar: yorum satırı DEĞİL olanlar
+        active_content = "\n".join(
+            line for line in content.splitlines()
+            if not line.strip().startswith('#')
+        )
+
         re_a = re.compile(
             r'set_property\s+-dict\s+[{\[]\s*PACKAGE_PIN\s+(\w+)\s+IOSTANDARD\s+(\w+)\s*[}\]]\s*'
             r'\[get_ports\s+[{\[]?\s*([^\]\}]+?)\s*[}\]]?\]',
             re.IGNORECASE,
         )
-        for m in re_a.finditer(content):
+        for m in re_a.finditer(active_content):
             entries[m.group(3).strip()] = (m.group(1), m.group(2))
 
-        # Format B — iki ayrı set_property satırı
+        # Format B — iki ayrı set_property satırı (sadece aktif satırlardan)
         re_pin = re.compile(r'set_property\s+PACKAGE_PIN\s+(\w+)\s+\[get_ports\s+[{\[]?\s*([^\]\}]+?)\s*[}\]]?\]', re.IGNORECASE)
         re_std = re.compile(r'set_property\s+IOSTANDARD\s+(\w+)\s+\[get_ports\s+[{\[]?\s*([^\]\}]+?)\s*[}\]]?\]', re.IGNORECASE)
-        pins: dict[str, str] = {m.group(2).strip(): m.group(1) for m in re_pin.finditer(content)}
-        stds: dict[str, str] = {m.group(2).strip(): m.group(1) for m in re_std.finditer(content)}
+        pins: dict[str, str] = {m.group(2).strip(): m.group(1) for m in re_pin.finditer(active_content)}
+        stds: dict[str, str] = {m.group(2).strip(): m.group(1) for m in re_std.finditer(active_content)}
         for sig, pin in pins.items():
             if sig not in entries:
                 entries[sig] = (pin, stds.get(sig, ""))
 
-        if not entries:
+        # Header: aktif/yorumlu bilgisi her zaman eklenir (pin yoksa bile)
+        comment_note = ""
+        if commented_constraints > 0:
+            comment_note = (
+                f"[NOT: Bu bölümde {active_constraints} aktif, "
+                f"{commented_constraints} yorumlu (#) constraint var. "
+                f"Yorumlu satırlar devre dışıdır — aktif constraint olarak raporlama.]\n"
+            )
+
+        if not entries and not comment_note:
             return ""
+
+        if not entries:
+            return f"[XDC — {file_name}]\n{comment_note}---\n"
 
         lines = [f"  {sig} -> {pin}" + (f" {std}" if std else "")
                  for sig, (pin, std) in sorted(entries.items())]
-        return f"[XDC Pin Assignments — {file_name}]\n" + "\n".join(lines) + "\n---\n"
+        header = f"[XDC Pin Assignments — {file_name}]\n"
+        if comment_note:
+            header += comment_note
+        return header + "\n".join(lines) + "\n---\n"
 
     @staticmethod
     def _tcl_ip_summary(content: str, file_name: str) -> str:
@@ -308,6 +341,8 @@ class SourceFileChunker:
             return self._chunk_bd_json(content, file_path, project, related_node_ids or [])
         elif ext == ".pdf":
             return self._chunk_pdf(file_path, project, related_node_ids or [])
+        elif ext == ".prj":
+            return self._chunk_mig_prj(content, file_path, project, related_node_ids or [])
         elif ext in (".md", ".txt"):
             return self._chunk_text(content, file_path, ext.lstrip("."), project, related_node_ids or [])
         else:
@@ -717,11 +752,40 @@ class SourceFileChunker:
                             chunk_label=f"{proc_name} (header)",
                             related_node_ids=node_ids,
                         ))
+                    # Split regex'leri — komut adına dayalı (yorum satırına değil)
+                    _addr_seg_re  = re.compile(r'(?m)^\s*create_bd_addr_seg\b')
+                    # Yalnızca connect_bd_net (sinyal bağlantıları: interrupt wiring, clk, reset)
+                    # connect_bd_intf_net (AXI bus) KAPSANMIYOR — AXI bus xadc/son-IP chunk'ında kalır
+                    # Sebep: intf_net satırları sinyal sorularında gereksiz gürültü + MAX_CHUNK_CHARS'ı dolduruyor
+                    _net_conn_re  = re.compile(r'(?m)^\s*connect_bd_net\b(?!.*intf)')
+
                     # Each IP instance block
                     for ii, im in enumerate(inst_matches):
                         ip_name = im.group(1)
                         blk_start = im.start()
                         blk_end = inst_matches[ii + 1].start() if ii + 1 < len(inst_matches) else len(proc_body)
+
+                        # Son IP bloğunda: 3 kısma bölünebilir
+                        # IP config | net_connections | address_map
+                        addr_map_content = None
+                        addr_map_sl = None
+                        net_conn_content = None
+                        net_conn_sl = None
+                        if ii == len(inst_matches) - 1:
+                            # Önce address_map sınırını bul
+                            addr_m = _addr_seg_re.search(proc_body, blk_start)
+                            if addr_m and addr_m.start() < blk_end:
+                                addr_map_sl = sl + proc_body[:addr_m.start()].count("\n")
+                                addr_map_content = proc_body[addr_m.start():blk_end].strip()
+                                blk_end = addr_m.start()  # IP bloğunu kırp
+
+                            # Sonra connect_bd_net sınırını bul (address_map'ten önceki bölgede)
+                            net_m = _net_conn_re.search(proc_body, blk_start)
+                            if net_m and net_m.start() < blk_end:
+                                net_conn_sl = sl + proc_body[:net_m.start()].count("\n")
+                                net_conn_content = proc_body[net_m.start():blk_end].strip()
+                                blk_end = net_m.start()  # IP config'i kırp
+
                         blk = proc_body[blk_start:blk_end].strip()
                         blk_sl = sl + proc_body[:blk_start].count("\n")
                         blk_el = sl + proc_body[:blk_end].count("\n")
@@ -737,6 +801,52 @@ class SourceFileChunker:
                                 start_line=blk_sl,
                                 end_line=blk_el,
                                 chunk_label=ip_name,
+                                related_node_ids=node_ids,
+                            ))
+
+                        # Net connections chunk: connect_bd_net sinyal bağlantıları
+                        # Interrupt port assignments, clock routing, reset signals içerir.
+                        # Büyük dosyalarda (çok sayıda net) _split_text ile birden fazla chunk.
+                        if net_conn_content and len(net_conn_content) > 20:
+                            net_header = (
+                                f"[TCL Net Connections] {Path(file_path).name} — "
+                                f"Signal wiring (connect_bd_net): interrupt port assignments, "
+                                f"clock routing, reset signals, sensor connections.\n\n"
+                            )
+                            net_enriched = net_header + net_conn_content
+                            net_el = net_conn_sl + net_conn_content.count("\n")
+                            net_parts = self._split_text(net_enriched) if len(net_enriched) > MAX_CHUNK_CHARS else [net_enriched]
+                            for j, sub in enumerate(net_parts):
+                                chunks.append(SourceChunk(
+                                    chunk_id=f"{stem}_net_connections_{j}" if j else f"{stem}_net_connections",
+                                    content=sub,
+                                    file_path=file_path,
+                                    file_type="tcl",
+                                    project=project,
+                                    start_line=net_conn_sl,
+                                    end_line=net_el,
+                                    chunk_label="net_connections",
+                                    related_node_ids=node_ids,
+                                ))
+
+                        # Address map chunk: create_bd_addr_seg bloğu
+                        if addr_map_content and len(addr_map_content) > 20:
+                            addr_header = (
+                                f"[TCL Address Map] {Path(file_path).name} — "
+                                f"AXI address segment assignments (create_bd_addr_seg).\n"
+                                f"IP offset/range: peripheral base addresses for MicroBlaze data/instruction spaces.\n\n"
+                            )
+                            addr_enriched = addr_header + addr_map_content
+                            addr_el = sl + proc_body[:blk_end + len(addr_map_content)].count("\n")
+                            chunks.append(SourceChunk(
+                                chunk_id=f"{stem}_address_map",
+                                content=addr_enriched[:MAX_CHUNK_CHARS],
+                                file_path=file_path,
+                                file_type="tcl",
+                                project=project,
+                                start_line=addr_map_sl,
+                                end_line=addr_el,
+                                chunk_label="address_map",
                                 related_node_ids=node_ids,
                             ))
                 else:
@@ -1035,6 +1145,199 @@ class SourceFileChunker:
         return chunks if chunks else self._chunk_default(content, file_path, file_type, project, node_ids)
 
     # ------------------------------------------------------------------
+    # Xilinx MIG .prj (XML) — DDR3/DDR2 pin + clock + AXI ayarları
+    # ------------------------------------------------------------------
+
+    def _chunk_mig_prj(self, content: str, file_path: str, project: str,
+                       node_ids: List[str]) -> List[SourceChunk]:
+        """Xilinx MIG .prj XML dosyasını kapsamlı okunabilir metne çevir.
+        Format imzası yoksa (sim filelist vb.) sıfır chunk döndür — gürültü yok.
+        Tüm alanlar düz metin olarak çıkarılır — soru uzayı regex sınırı yok.
+        """
+        if "<Project NoOfControllers=" not in content[:500]:
+            return []
+
+        fname = Path(file_path).stem
+
+        def _tag(tag: str, default: str = "?") -> str:
+            m = re.search(rf'<{tag}[^>]*>(.*?)</{tag}>', content, re.IGNORECASE | re.DOTALL)
+            return m.group(1).strip() if m else default
+
+        def _attr(tag: str, attr: str, default: str = "?") -> str:
+            m = re.search(rf'<{tag}\b[^>]*/>', content, re.IGNORECASE)
+            if m:
+                a = re.search(rf'{attr}="([^"]*)"', m.group(0), re.IGNORECASE)
+                return a.group(1).strip() if a else default
+            return default
+
+        # ── Genel yapılandırma ────────────────────────────────────────────────
+        ctrl_m = re.search(r'NoOfControllers="(\d+)"', content)
+        ddr_period = _tag("TimePeriod")
+        try:
+            ddr_freq = f"{1_000_000 / float(ddr_period):.0f} MHz"
+        except Exception:
+            ddr_freq = "?"
+
+        mem_size_raw = _tag("C0_MEM_SIZE")
+        try:
+            mem_size_mb = f"{int(mem_size_raw) // (1024*1024)} MB"
+        except Exception:
+            mem_size_mb = mem_size_raw
+
+        lines = [
+            f"[MIG PRJ] {fname}",
+            f"Kaynak: {file_path}",
+            "",
+            "── Genel Yapılandırma ──────────────────────────────────────",
+            f"  FPGA Target        : {_tag('TargetFPGA')}",
+            f"  MIG Version        : {_tag('Version')}",
+            f"  Module Name        : {_tag('ModuleName')}",
+            f"  Controllers        : {ctrl_m.group(1) if ctrl_m else '?'}",
+            f"  System Clock       : {_tag('SystemClock')}",
+            f"  Reference Clock    : {_tag('ReferenceClock')}",
+            f"  Reset Polarity     : {_tag('SysResetPolarity')}",
+            f"  Low Power          : {_tag('LowPower_En')}",
+            f"  XADC               : {_tag('XADC_En')}",
+            f"  DCI Inputs         : {_tag('dci_inputs')}",
+            "",
+            "── DDR3 Controller (C0) ────────────────────────────────────",
+            f"  Memory Device      : {_tag('MemoryDevice')}",
+            f"  Memory Voltage     : {_tag('MemoryVoltage')}",
+            f"  Memory Size        : {mem_size_mb}  ({mem_size_raw} bytes)",
+            f"  Data Width         : {_tag('DataWidth')} bit",
+            f"  Data Mask          : {_tag('DataMask')}",
+            f"  ECC                : {_tag('ECC')}",
+            f"  Ordering           : {_tag('Ordering')}",
+            f"  Bank Machine Count : {_tag('BankMachineCnt')}",
+            f"  Address Map        : {_tag('UserMemoryAddressMap')}",
+            f"  Row Address        : {_tag('RowAddress')} bit",
+            f"  Col Address        : {_tag('ColAddress')} bit",
+            f"  Bank Address       : {_tag('BankAddress')} bit",
+            "",
+            "── Clock & PHY ─────────────────────────────────────────────",
+            f"  Input Clock Freq   : {_tag('InputClkFreq')} MHz",
+            f"  DDR3 Period        : {ddr_period} ps  →  {ddr_freq}",
+            f"  PHY Ratio          : {_tag('PHYRatio')}",
+            f"  MMCM VCO           : {_tag('MMCM_VCO')} MHz",
+            f"  MMCM ClkOut0       : {_tag('MMCMClkOut0')}",
+            f"  UI Extra Clocks    : {_tag('UIExtraClocks')}",
+            "",
+            "── AXI Interface ───────────────────────────────────────────",
+            f"  Port Interface     : {_tag('PortInterface')}",
+            f"  AXI Addr Width     : {_tag('C0_S_AXI_ADDR_WIDTH')} bit",
+            f"  AXI Data Width     : {_tag('C0_S_AXI_DATA_WIDTH')} bit",
+            f"  AXI ID Width       : {_tag('C0_S_AXI_ID_WIDTH')} bit",
+            f"  RD/WR Arb Algo     : {_tag('C0_C_RD_WR_ARB_ALGORITHM')}",
+            f"  Narrow Burst       : {_tag('C0_S_AXI_SUPPORTS_NARROW_BURST')}",
+            "",
+            "── Timing Parameters ───────────────────────────────────────",
+        ]
+
+        # TimingParameters tek satır attribute olarak geliyor
+        tp_m = re.search(r'<Parameters\s+([^/]+)/>', content, re.IGNORECASE)
+        if tp_m:
+            tp_attrs = dict(re.findall(r'(\w+)="([^"]*)"', tp_m.group(1)))
+            for k, v in tp_attrs.items():
+                lines.append(f"  {k:<20s} : {v}")
+        else:
+            lines.append("  (timing parametreleri bulunamadı)")
+
+        lines += [
+            "",
+            "── Mode Register Değerleri ─────────────────────────────────",
+            f"  Burst Length       : {_tag('mrBurstLength')}",
+            f"  Burst Type         : {_tag('mrBurstType')}",
+            f"  CAS Latency        : {_tag('mrCasLatency')}",
+            f"  CAS Write Latency  : {_tag('mr2CasWriteLatency')}",
+            f"  Mode               : {_tag('mrMode')}",
+            f"  DLL Reset          : {_tag('mrDllReset')}",
+            f"  PD Mode            : {_tag('mrPdMode')}",
+            f"  DLL Enable         : {_tag('emrDllEnable')}",
+            f"  Output Drive       : {_tag('emrOutputDriveStrength')}",
+            f"  RTT (ODT)          : {_tag('emrRTT')}",
+            f"  Additive Latency   : {_tag('emrPosted')}",
+            f"  Address Mirroring  : {_tag('emrMirrorSelection')}",
+            f"  TDQS Enable        : {_tag('emrDQS')}",
+            f"  Auto Self Refresh  : {_tag('mr2AutoSelfRefresh')}",
+            f"  RTT_WR             : {_tag('mr2RTTWR')}",
+            f"  Partial Array SR   : {_tag('mr2PartialArraySelfRefresh')}",
+            "",
+            "── Pin Atamaları (PinSelection) ────────────────────────────",
+        ]
+
+        # Pin atamaları
+        pin_re = re.compile(r'<Pin\b([^/]*)/>', re.IGNORECASE)
+        attr_re = re.compile(r'(\w+)="([^"]*)"')
+        pins = []
+        for m in pin_re.finditer(content):
+            attrs = dict(attr_re.findall(m.group(1)))
+            pad = attrs.get("PADName", "?")
+            sig = attrs.get("name", "?")
+            ios = attrs.get("IOSTANDARD", "?")
+            if pad and sig:
+                pins.append((ios, pad, sig))
+
+        for ios, pad, sig in pins:
+            lines.append(f"  {sig:<35s} → PACKAGE_PIN {pad:<8s} IOSTANDARD={ios}")
+
+        lines += [
+            f"  Toplam pin sayısı  : {len(pins)}",
+            "",
+            "── Sistem Saati ────────────────────────────────────────────",
+        ]
+
+        # System_Clock
+        sc_m = re.search(r'<System_Clock>(.*?)</System_Clock>', content, re.IGNORECASE | re.DOTALL)
+        if sc_m:
+            for pm in pin_re.finditer(sc_m.group(1)):
+                attrs = dict(attr_re.findall(pm.group(1)))
+                lines.append(f"  {attrs.get('name','?'):<20s} → Bank {attrs.get('Bank','?')}, PADName {attrs.get('PADName','?')}")
+
+        lines += ["", "── Bağlanmamış Sinyaller (No connect) ──────────────────────"]
+
+        # System_Control
+        sctl_m = re.search(r'<System_Control>(.*?)</System_Control>', content, re.IGNORECASE | re.DOTALL)
+        if sctl_m:
+            for pm in pin_re.finditer(sctl_m.group(1)):
+                attrs = dict(attr_re.findall(pm.group(1)))
+                if "No connect" in attrs.get("PADName", ""):
+                    lines.append(f"  {attrs.get('name','?')}")
+
+        full_text = "\n".join(lines).strip()
+
+        # Tek chunk — dosya küçük, bölmeye gerek yok
+        # Büyük olursa (nadiren) config + pins olarak ikiye böl
+        if len(full_text) <= MAX_CHUNK_CHARS:
+            return [SourceChunk(
+                chunk_id=f"{fname}_mig_prj",
+                content=full_text,
+                file_path=file_path,
+                file_type="mig_prj",
+                project=project,
+                start_line=1,
+                end_line=content.count("\n") + 1,
+                chunk_label=f"{fname}_mig_full_config",
+                related_node_ids=node_ids,
+            )]
+
+        # Büyük dosya: config + pins ayrı
+        split_idx = full_text.find("── Pin Atamaları")
+        chunks = []
+        for i, part in enumerate([full_text[:split_idx], full_text[split_idx:]]):
+            if part.strip():
+                chunks.append(SourceChunk(
+                    chunk_id=f"{fname}_mig_prj_p{i}",
+                    content=part.strip(),
+                    file_path=file_path,
+                    file_type="mig_prj",
+                    project=project,
+                    start_line=0, end_line=0,
+                    chunk_label=f"{fname}_mig_{'config' if i==0 else 'pins'}",
+                    related_node_ids=node_ids,
+                ))
+        return chunks
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
@@ -1124,11 +1427,13 @@ class SourceChunkStore:
         self._collection = None
         self._embedder = None
         self._chunker = SourceFileChunker()
-        # BM25 index — lazy build, invalidate on add/reset
+        # BM25 index — lazy build, disk-cached, invalidate on add/reset
         self._bm25 = None
         self._bm25_ids: List[str] = []
         self._bm25_metas: List[Dict] = []
         self._bm25_docs: List[str] = []
+        # Disk cache path: persist_directory/bm25_cache.pkl
+        self._bm25_cache_path = Path(persist_directory) / "bm25_cache.pkl"
 
     # ------------------------------------------------------------------
     # BM25 tokenizer ve index
@@ -1151,7 +1456,11 @@ class SourceChunkStore:
         return tokens
 
     def _ensure_bm25(self):
-        """BM25 index yoksa veya ChromaDB'den farklıysa yeniden kur."""
+        """
+        BM25 index yoksa kur; önce disk cache'ten yükle, yoksa ChromaDB'den sıfırdan kur.
+        100+ proje için kritik: 960+ chunk için yeniden tokenize etmek ~2-3 saniye sürebilir.
+        Disk cache ile bu maliyet sadece ilk indexlemede ödenir.
+        """
         try:
             from rank_bm25 import BM25Okapi
         except ImportError:
@@ -1162,11 +1471,26 @@ class SourceChunkStore:
         if db_count == 0:
             return
 
-        # Eğer BM25 zaten varsa ve chunk sayısı ChromaDB ile eşleşiyorsa atla
+        # In-memory cache hâlâ geçerliyse atla
         if self._bm25 is not None and len(self._bm25_ids) == db_count:
             return
 
-        # Yeni chunk'lar eklenmiş ya da ilk kez kurulacak → sıfırdan kur
+        # ── Disk cache'ten yükle ─────────────────────────────────────────────
+        if self._bm25_cache_path.exists():
+            import pickle
+            try:
+                with open(self._bm25_cache_path, "rb") as f:
+                    cached = pickle.load(f)
+                if cached.get("count") == db_count:
+                    self._bm25_ids   = cached["ids"]
+                    self._bm25_metas = cached["metas"]
+                    self._bm25_docs  = cached["docs"]
+                    self._bm25       = BM25Okapi(cached["tokenized"])
+                    return  # Cache geçerli, yeniden kurmaya gerek yok
+            except Exception:
+                pass  # Bozuk cache → sıfırdan kur
+
+        # ── ChromaDB'den sıfırdan kur ────────────────────────────────────────
         data = col.get(include=["documents", "metadatas"])
         self._bm25_ids   = data.get("ids", [])
         self._bm25_metas = data.get("metadatas", [])
@@ -1174,12 +1498,33 @@ class SourceChunkStore:
         tokenized = [self._bm25_tokenize(doc) for doc in self._bm25_docs]
         self._bm25 = BM25Okapi(tokenized)
 
+        # Disk'e kaydet
+        import pickle
+        try:
+            self._bm25_cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._bm25_cache_path, "wb") as f:
+                pickle.dump({
+                    "count":     db_count,
+                    "ids":       self._bm25_ids,
+                    "metas":     self._bm25_metas,
+                    "docs":      self._bm25_docs,
+                    "tokenized": tokenized,
+                }, f)
+        except Exception:
+            pass  # Disk yazma hatası kritik değil — in-memory index hâlâ çalışır
+
     def _invalidate_bm25(self):
-        """Yeni chunk eklenince veya reset'te BM25 index'i sıfırla."""
+        """Yeni chunk eklenince veya reset'te BM25 index'i hem RAM'den hem diskten sıfırla."""
         self._bm25 = None
         self._bm25_ids = []
         self._bm25_metas = []
         self._bm25_docs = []
+        # Disk cache geçersiz → sil, sonraki search'te yeniden build edilecek
+        if self._bm25_cache_path.exists():
+            try:
+                self._bm25_cache_path.unlink()
+            except Exception:
+                pass
 
     def _bm25_search(
         self,
@@ -1427,7 +1772,14 @@ class SourceChunkStore:
 
         # ── 3. RRF merge ─────────────────────────────────────────────────────
         if bm25_hits:
-            return self._rrf_merge(semantic_hits, bm25_hits, n_results, self._RRF_K)
+            merged = self._rrf_merge(semantic_hits, bm25_hits, n_results, self._RRF_K)
+            # BM25 rank-1 garantisi: BM25'in en iyi eşleşmesi her zaman context'e girer.
+            # Exact-keyword sorgularında (PIN adı, parametre adı, komut adı) kritik.
+            bm25_top = bm25_hits[0]
+            bm25_top_id = bm25_top["chunk_id"]
+            if bm25_top_id not in {h["chunk_id"] for h in merged}:
+                merged.append(bm25_top)
+            return merged
         # BM25 yoksa (rank-bm25 kurulmamış) → sadece semantic
         return semantic_hits[:n_results]
 
@@ -1576,6 +1928,30 @@ class SourceChunkStore:
                     "related_node_ids": node_ids,
                 })
         return results
+
+    def enumerate_project_chunks(
+        self,
+        project: str,
+        file_types: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Bir projenin tüm chunk metadata'larını döndür (içerik yok).
+        ENUMERATE sorgu modu için — top-K değil, tam liste.
+        file_types: ["tcl", "xdc"] gibi filtre; None → tümü.
+        """
+        col = self._get_collection()
+        if col.count() == 0:
+            return []
+        try:
+            conditions: List[Dict] = [{"project": project}]
+            if file_types:
+                conditions.append({"file_type": {"$in": file_types}})
+            where = {"$and": conditions} if len(conditions) > 1 else conditions[0]
+            data = col.get(where=where, include=["metadatas"])
+            return data.get("metadatas", [])
+        except Exception as e:
+            print(f"  [SourceChunkStore] enumerate_project_chunks hata: {e}")
+            return []
 
     def delete_by_filepath(self, file_path: str) -> int:
         """

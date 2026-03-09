@@ -414,10 +414,12 @@ if prompt:
 
             # LLM
             st.write("🤖 LLM yanıt üretiyor…")
-            from rag_v2.response_builder import build_llm_context, FPGA_RAG_SYSTEM_PROMPT
+            from rag_v2.response_builder import build_llm_context, build_system_prefix
             ctx = build_llm_context(qr, gr, max_nodes=15, max_chars=22000)
 
-            system = FPGA_RAG_SYSTEM_PROMPT.split("CONTEXT:")[0].strip()
+            # Dinamik sistem prefix: graph PROJECT node'ları + source chunk projeleri birleştirilir.
+            # Yeni proje eklenince otomatik güncellenir — kod değişikliği gerekmez.
+            system = build_system_prefix(gs, source_chunk_store=sc)
 
             llm = get_llm(llm_model)
             llm_answer = None
