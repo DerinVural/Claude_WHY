@@ -113,8 +113,9 @@ def build_llm_context(
         lines.append("(Genel Vivado/Vitis referansı. Proje kaynak koduyla çelişirse kaynak kodu tercih et.)")
         lines.append("")
 
-        doc_budget = max(1500, int(max_chars * 0.20))
-        for dc in query_result.doc_chunks[:4]:
+        # G3: Ayrı garantili bütçe — source chunk yarışmasından bağımsız
+        doc_budget = max(2000, int(max_chars * 0.25))
+        for dc in query_result.doc_chunks[:6]:
             doc_title = dc.get("doc_title", dc.get("doc_id", ""))
             section = dc.get("section", "")
             page_num = dc.get("page_num", 0)

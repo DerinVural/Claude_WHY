@@ -22,12 +22,13 @@ from __future__ import annotations
 import os
 import re
 import sys
-import pickle
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 _PROJ_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(_PROJ_ROOT / "src"))
+
+from rag_v2.fts5_index import FTS5Index
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
@@ -81,10 +82,10 @@ class DocStore:
     def __init__(self, persist_dir: str = "db/chroma_docs"):
         self._persist_dir = str(_PROJ_ROOT / persist_dir)
         self._collection = None
-        self._bm25 = None          # lazy
-        self._bm25_docs: List[str] = []
-        self._bm25_ids: List[str] = []
-        self._bm25_cache_path = Path(self._persist_dir) / "bm25_cache.pkl"
+        # FTS5 keyword index — disk-persistent, incremental, zero cold-start
+        _fts_db = _PROJ_ROOT / "db" / "fts5_docs.db"
+        self._fts = FTS5Index(str(_fts_db))
+        self._fts_synced = False
 
     # ------------------------------------------------------------------
     # ChromaDB lazy init
@@ -93,15 +94,13 @@ class DocStore:
     def _get_collection(self):
         if self._collection is None:
             import chromadb
-            from chromadb.utils import embedding_functions as ef
             Path(self._persist_dir).mkdir(parents=True, exist_ok=True)
             client = chromadb.PersistentClient(path=self._persist_dir)
-            emb_fn = ef.SentenceTransformerEmbeddingFunction(
-                model_name="all-MiniLM-L6-v2"
-            )
+            # External embeddings (paraphrase-multilingual-mpnet-base-v2, 768-dim)
+            # shared singleton from embedder.py — model yalnızca bir kez yüklenir.
             self._collection = client.get_or_create_collection(
                 name=self._CHROMA_COLLECTION,
-                embedding_function=emb_fn,
+                embedding_function=None,  # external
                 metadata={"hnsw:space": "cosine"},
             )
         return self._collection
@@ -129,13 +128,17 @@ class DocStore:
         if not chunks:
             return 0
 
+        from rag_v2.embedder import embed_texts
         col = self._get_collection()
-        batch_size = 100
+        batch_size = 64
         for i in range(0, len(chunks), batch_size):
             batch = chunks[i:i + batch_size]
+            texts = [c.content for c in batch]
+            embeddings = embed_texts(texts)
             col.add(
                 ids=[c.chunk_id for c in batch],
-                documents=[c.content for c in batch],
+                documents=texts,
+                embeddings=embeddings,
                 metadatas=[{
                     "doc_id": c.doc_id,
                     "doc_title": c.doc_title,
@@ -144,12 +147,19 @@ class DocStore:
                 } for c in batch],
             )
 
-        # BM25 cache'i geçersiz kıl
-        self._bm25 = None
-        self._bm25_docs = []
-        self._bm25_ids = []
-        if self._bm25_cache_path.exists():
-            self._bm25_cache_path.unlink()
+        # FTS5'e incremental ekle
+        fts_items = []
+        for c in chunks:
+            fts_items.append({
+                "chunk_id": c.chunk_id,
+                "content":  c.content,
+                "doc_id":   c.doc_id,
+                "doc_title": c.doc_title,
+                "section":  c.section,
+                "page_num": c.page_num,
+            })
+        self._fts.add_batch(fts_items)
+        self._fts_synced = True
 
         return len(chunks)
 
@@ -184,8 +194,10 @@ class DocStore:
         n_candidates = min(n_results * 4, total)
 
         # 1. Semantic search
+        from rag_v2.embedder import embed_text
+        q_emb = embed_text(query)
         sem_res = col.query(
-            query_texts=[query],
+            query_embeddings=[q_emb],
             n_results=n_candidates,
             include=["documents", "metadatas", "distances"],
         )
@@ -194,8 +206,9 @@ class DocStore:
         sem_metas = sem_res["metadatas"][0] if sem_res["metadatas"] else []
         sem_dists = sem_res["distances"][0] if sem_res["distances"] else []
 
-        # 2. BM25 search
-        bm25_ranked = self._bm25_search(query, n_candidates)
+        # 2. FTS5 BM25 search
+        self._ensure_fts5()
+        fts_raw = self._fts.search(query, n_candidates)
 
         # 3. RRF merge
         RRF_K = 60
@@ -217,16 +230,17 @@ class DocStore:
                 "similarity": round(similarity, 4),
             }
 
-        for rank, (cid, content, meta) in enumerate(bm25_ranked):
+        for rank, h in enumerate(fts_raw):
+            cid = h["chunk_id"]
             scores[cid] = scores.get(cid, 0.0) + 1.0 / (RRF_K + rank + 1)
             if cid not in id_to_data:
                 id_to_data[cid] = {
                     "chunk_id": cid,
-                    "content": content,
-                    "doc_id": meta.get("doc_id", ""),
-                    "doc_title": meta.get("doc_title", ""),
-                    "section": meta.get("section", ""),
-                    "page_num": meta.get("page_num", 0),
+                    "content": h["content"],
+                    "doc_id": h.get("doc_id", ""),
+                    "doc_title": h.get("doc_title", ""),
+                    "section": h.get("section", ""),
+                    "page_num": h.get("page_num", 0),
                     "similarity": 0.0,
                 }
 
@@ -236,102 +250,107 @@ class DocStore:
         for cid, rrf_score in ranked[:k]:
             d = id_to_data[cid]
             d["rrf_score"] = round(rrf_score, 4)
-            # Eşik filtresi — düşük puanlı doc chunk'ları context'i kirletir
-            if d["similarity"] >= DOC_SIM_THRESHOLD or rrf_score >= 1.0 / (RRF_K + 2):
+            if d["similarity"] >= DOC_SIM_THRESHOLD:
                 results.append(d)
 
         return results
 
-    # ------------------------------------------------------------------
-    # BM25
-    # ------------------------------------------------------------------
-
-    def _build_bm25(self):
-        """Lazy BM25 index. Disk cache'i kontrol et."""
-        col = self._get_collection()
-        total = col.count()
-        if total == 0:
-            return
-
-        # Disk cache geçerli mi?
-        if self._bm25_cache_path.exists():
-            try:
-                with open(self._bm25_cache_path, "rb") as f:
-                    cached = pickle.load(f)
-                if cached.get("count") == total:
-                    self._bm25 = cached["bm25"]
-                    self._bm25_docs = cached["docs"]
-                    self._bm25_ids = cached["ids"]
-                    self._bm25_metas = cached.get("metas", [])
-                    return
-            except Exception:
-                pass
-
-        # Tüm chunk'ları al
-        res = col.get(include=["documents", "metadatas"])
-        ids = res.get("ids", [])
-        docs = res.get("documents", [])
-        metas = res.get("metadatas", [])
-
-        # Tokenize
-        tok_re = re.compile(r'[a-zA-Z0-9_]+')
-        tokenized = []
-        for d in docs:
-            tokens = tok_re.findall(d.lower())
-            # Alt çizgi split: set_dont_touch → set_dont_touch, set, dont, touch
-            expanded = []
-            for t in tokens:
-                expanded.append(t)
-                if "_" in t:
-                    expanded.extend(t.split("_"))
-            tokenized.append(expanded)
-
-        from rank_bm25 import BM25Okapi
-        self._bm25 = BM25Okapi(tokenized)
-        self._bm25_docs = docs
-        self._bm25_ids = ids
-        self._bm25_metas = metas
-
-        # Disk'e yaz
-        Path(self._persist_dir).mkdir(parents=True, exist_ok=True)
-        try:
-            with open(self._bm25_cache_path, "wb") as f:
-                pickle.dump({
-                    "count": total,
-                    "bm25": self._bm25,
-                    "docs": docs,
-                    "ids": ids,
-                    "metas": metas,
-                }, f)
-        except Exception:
-            pass
-
-    def _bm25_search(self, query: str, n: int) -> List[Tuple[str, str, Dict]]:
-        """BM25 arama — [(chunk_id, content, meta)] döndürür."""
-        try:
-            if self._bm25 is None:
-                self._build_bm25()
-            if self._bm25 is None:
-                return []
-
-            tok_re = re.compile(r'[a-zA-Z0-9_]+')
-            q_tokens = tok_re.findall(query.lower())
-            expanded = []
-            for t in q_tokens:
-                expanded.append(t)
-                if "_" in t:
-                    expanded.extend(t.split("_"))
-
-            scores = self._bm25.get_scores(expanded)
-            top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:n]
-            results = []
-            for i in top_indices:
-                if scores[i] > 0:
-                    meta = self._bm25_metas[i] if hasattr(self, "_bm25_metas") else {}
-                    results.append((self._bm25_ids[i], self._bm25_docs[i], meta))
-            return results
-        except Exception:
+    def search_in_docs(
+        self, query: str, doc_ids: List[str], n_per_doc: int = 2
+    ) -> List[Dict[str, Any]]:
+        """
+        Belirli doc_id'lere filtrelenmiş semantic arama.
+        IP→Doc yapısal retrieval için: her doc_id için sorguya en yakın n_per_doc chunk döner.
+        DOC_SIM_THRESHOLD uygulanmaz — yapısal retrieval, garantili ilgili dok.
+        """
+        if not doc_ids:
             return []
+        col = self._get_collection()
+        if col.count() == 0:
+            return []
+
+        from rag_v2.embedder import embed_text
+        q_emb = embed_text(query)
+
+        results: List[Dict[str, Any]] = []
+        seen_ids: set = set()
+
+        for doc_id in doc_ids:
+            try:
+                res = col.query(
+                    query_embeddings=[q_emb],
+                    n_results=n_per_doc,
+                    where={"doc_id": doc_id},
+                    include=["documents", "metadatas", "distances"],
+                )
+                if not res["ids"] or not res["ids"][0]:
+                    continue
+                for cid, doc, meta, dist in zip(
+                    res["ids"][0], res["documents"][0],
+                    res["metadatas"][0], res["distances"][0],
+                ):
+                    if cid not in seen_ids:
+                        seen_ids.add(cid)
+                        results.append({
+                            "chunk_id":  cid,
+                            "content":   doc,
+                            "doc_id":    meta.get("doc_id", ""),
+                            "doc_title": meta.get("doc_title", ""),
+                            "section":   meta.get("section", ""),
+                            "page_num":  meta.get("page_num", 0),
+                            "similarity": round(max(0.0, 1.0 - dist), 4),
+                        })
+            except Exception:
+                continue
+
+        return results
+
+    # ------------------------------------------------------------------
+    # FTS5
+    # ------------------------------------------------------------------
+
+    def _ensure_fts5(self):
+        """
+        FTS5 index ChromaDB ile senkron mu kontrol et.
+        Değilse tüm koleksiyonu FTS5'e backfill et (tek seferlik, ~5-10 saniye 17K chunk için).
+        """
+        if self._fts_synced:
+            return
+        col = self._get_collection()
+        chroma_count = col.count()
+        if chroma_count == 0:
+            self._fts_synced = True
+            return
+        fts_count = self._fts.count()
+        if fts_count == chroma_count:
+            self._fts_synced = True
+            return
+        print(f"  [FTS5-docs] Backfill başlıyor: {chroma_count} chunk ChromaDB → FTS5 ...")
+        self._fts.reset()
+        # Büyük koleksiyonlar için batch okuma (175K+ chunk desteği)
+        BATCH = 2000
+        offset = 0
+        while True:
+            res = col.get(limit=BATCH, offset=offset, include=["documents", "metadatas"])
+            ids   = res.get("ids", [])
+            if not ids:
+                break
+            docs  = res.get("documents", [])
+            metas = res.get("metadatas", [])
+            items = []
+            for cid, doc, meta in zip(ids, docs, metas):
+                items.append({
+                    "chunk_id":  cid,
+                    "content":   doc,
+                    "doc_id":    meta.get("doc_id", ""),
+                    "doc_title": meta.get("doc_title", ""),
+                    "section":   meta.get("section", ""),
+                    "page_num":  meta.get("page_num", 0),
+                })
+            self._fts.add_batch(items)
+            offset += BATCH
+        print(f"  [FTS5-docs] Backfill tamamlandı: {self._fts.count()} chunk")
+        self._fts_synced = True
 
     # ------------------------------------------------------------------
     # PDF chunking — UG format aware
@@ -432,8 +451,8 @@ class DocStore:
                     page_num=pnum,
                 ))
             else:
-                # Büyük bölümü paragraf sınırında böl
-                parts = self._split_text(sec_text)
+                # Büyük bölümü overlap'li paragraf sınırında böl (G2: tablo satırları bölünmez)
+                parts = self._split_pdf_text(sec_text)
                 for j, part in enumerate(parts):
                     chunks.append(DocChunk(
                         chunk_id=f"{doc_id}_s{i}_{j}",
@@ -483,4 +502,50 @@ class DocStore:
             text = text[split_at:].strip()
         if text:
             parts.append(text)
+        return [p for p in parts if len(p) >= MIN_CHUNK_CHARS]
+
+    _TABLE_ROW_RE = re.compile(r'^\s*\d+[:\s\|]', re.MULTILINE)
+
+    def _split_pdf_text(
+        self, text: str, max_chars: int = MAX_CHUNK_CHARS, overlap: int = 250
+    ) -> List[str]:
+        """
+        G2: PDF için overlap'li bölümleme.
+        - Ardışık chunk'lar arasında 250 karakter örtüşme — register tablo satırları kaybolmaz.
+        - Split noktası tablo ortasına denk geliyorsa bir önceki boş satıra geri çekilir.
+        """
+        if len(text) <= max_chars:
+            return [text]
+
+        parts: List[str] = []
+        prev_tail = ""
+
+        while len(text) > max_chars:
+            # Önce \n\n, sonra \n ile bölme noktası bul
+            split_at = text.rfind("\n\n", 0, max_chars)
+            if split_at == -1:
+                split_at = text.rfind("\n", 0, max_chars)
+            if split_at <= 0:
+                split_at = max_chars
+
+            # Tablo ortasında mı? Son 5 satır tablo satırı ise geri çekil
+            candidate_tail = text[:split_at].split("\n")[-5:]
+            table_rows = sum(
+                1 for ln in candidate_tail
+                if self._TABLE_ROW_RE.match(ln) or "\t" in ln
+            )
+            if table_rows >= 3:
+                alt = text.rfind("\n\n", 0, split_at - 1)
+                if alt > split_at // 2:
+                    split_at = alt
+
+            chunk = (prev_tail + text[:split_at]).strip()
+            parts.append(chunk)
+            # Overlap: sonraki chunk için önceki chunk'ın sonunu al
+            prev_tail = text[max(0, split_at - overlap):split_at]
+            text = text[split_at:].strip()
+
+        if text:
+            parts.append((prev_tail + text).strip())
+
         return [p for p in parts if len(p) >= MIN_CHUNK_CHARS]

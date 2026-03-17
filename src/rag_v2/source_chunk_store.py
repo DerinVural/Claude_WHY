@@ -31,6 +31,8 @@ from typing import Any, Dict, List, Optional, Tuple
 _PROJ_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(_PROJ_ROOT / "src"))
 
+from rag_v2.fts5_index import FTS5Index
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Chunk dataclass
@@ -39,7 +41,7 @@ sys.path.insert(0, str(_PROJ_ROOT / "src"))
 class SourceChunk:
     __slots__ = ("chunk_id", "content", "file_path", "file_type",
                  "project", "start_line", "end_line", "chunk_label",
-                 "related_node_ids")
+                 "related_node_ids", "dim", "is_meta")
 
     def __init__(
         self,
@@ -52,6 +54,8 @@ class SourceChunk:
         end_line: int = 0,
         chunk_label: str = "",
         related_node_ids: Optional[List[str]] = None,
+        dim: str = "",
+        is_meta: int = 0,
     ):
         self.chunk_id = chunk_id
         self.content = content
@@ -62,6 +66,8 @@ class SourceChunk:
         self.end_line = end_line
         self.chunk_label = chunk_label
         self.related_node_ids = related_node_ids or []
+        self.dim = dim          # "HOW", "RELATION", "HOW RELATION", "WHAT", "DEBUG", ""
+        self.is_meta = is_meta  # 1 = dosya-düzeyinde meta chunk, 0 = içerik chunk
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -73,6 +79,8 @@ class SourceChunk:
             "end_line": self.end_line,
             "chunk_label": self.chunk_label,
             "related_node_ids": json.dumps(self.related_node_ids),
+            "dim": self.dim,
+            "is_meta": self.is_meta,
         }
 
 
@@ -95,6 +103,165 @@ class SourceFileChunker:
     Türkçe/İngilizce doğal dil sorguları ile teknik sözdizimi arasındaki
     boşluğu kapatır — query-time augmentation'a gerek kalmaz.
     """
+
+    # ---------------------------------------------------------------
+    # Semantic Dimension — README heading → dim etiketleme
+    # ---------------------------------------------------------------
+
+    _README_HOW_RE = re.compile(
+        r'(?i)running|run|setup|install|usage|getting.started|how.to|'
+        r'build|quick.start|steps?|workflow|deploy|'
+        r'çalıştır|kurulum|nasıl|kullanım|adım'
+    )
+    _README_WHY_RE = re.compile(
+        r'(?i)background|motivation|why|rationale|purpose|reason|'
+        r'neden|amaç|motivasyon'
+    )
+    _README_DEBUG_RE = re.compile(
+        r'(?i)troubleshoot|known.issue|issue|bug|faq|problem|error|'
+        r'hata|sorun|bilinen'
+    )
+    _README_WHAT_RE = re.compile(
+        r'(?i)overview|description|introduction|feature|about|what|'
+        r'genel|açıklama|tanım|özellik'
+    )
+
+    @classmethod
+    def _readme_heading_dim(cls, heading: str) -> str:
+        """Markdown başlığından semantic boyut belirle."""
+        h = heading.strip("# \t\n")
+        if cls._README_HOW_RE.search(h):
+            return "HOW"
+        if cls._README_DEBUG_RE.search(h):
+            return "DEBUG"
+        if cls._README_WHY_RE.search(h):
+            return "WHY"
+        if cls._README_WHAT_RE.search(h):
+            return "WHAT"
+        return "WHAT"  # varsayılan
+
+    # ---------------------------------------------------------------
+    # TCL Meta Chunk — HOW + RELATION boyutları
+    # ---------------------------------------------------------------
+
+    @staticmethod
+    def _tcl_meta_chunk(
+        content: str,
+        file_path: str,
+        project: str,
+        node_ids: List[str],
+    ) -> "Optional[SourceChunk]":
+        """
+        TCL dosyası için dosya-düzeyinde meta chunk üret.
+        HOW (çalıştırma), RELATION (bağımlılık), WHAT (part/BD adı) boyutlarını çıkarır.
+        Hiç bilgi bulunamazsa None döndürür.
+        """
+        stem = Path(file_path).stem
+        lines: List[str] = []
+        dims: set = set()
+
+        header_block = content[:3000]  # yalnızca dosya başını tara
+
+        # ── HOW: Usage / Purpose / Stage ──────────────────────────────────
+        usage_m   = re.search(r'#\s*Usage\s*[:\-]\s*(.+)',   header_block, re.IGNORECASE)
+        purpose_m = re.search(r'#\s*Purpose\s*[:\-]\s*(.+)', header_block, re.IGNORECASE)
+        author_m  = re.search(r'#\s*Author\s*[:\-]\s*(.+)',  header_block, re.IGNORECASE)
+        stage_m   = re.search(
+            r'#\s*(?:STAGE|Stage|AŞAMA)\s*(\d+)[:\s]*([^\n]{0,60})', header_block
+        )
+        # launch_runs / vivado batch varlığı = run script
+        is_run_script = bool(
+            re.search(r'\blaunch_runs\b|\bopen_project\b', content) and
+            not re.search(r'(?m)^proc\s+\w+', content[:500])
+        )
+
+        if usage_m:
+            lines.append(f"Çalıştırma : {usage_m.group(1).strip()}")
+            dims.add("HOW")
+        if purpose_m:
+            lines.append(f"Amaç       : {purpose_m.group(1).strip()}")
+            dims.add("HOW")
+        if stage_m:
+            desc = stage_m.group(2).strip().strip("#").strip()
+            lines.append(f"Aşama      : STAGE {stage_m.group(1)}" + (f" — {desc}" if desc else ""))
+            dims.add("HOW")
+        if is_run_script and not dims:
+            lines.append("Çalıştırma : vivado -mode batch -source ile çalıştırılabilir")
+            dims.add("HOW")
+
+        # ── RELATION: source / add_files / open_project ───────────────────
+        sourced = list(dict.fromkeys(
+            m.group(1) for m in re.finditer(
+                r'(?m)^\s*source\s+["\']?([^\s"\'#\n]+\.tcl)["\']?', content, re.IGNORECASE
+            )
+        ))
+        xdc_files = list(dict.fromkeys(
+            m.group(2) for m in re.finditer(
+                r'\badd_files\b[^\n]*?(["\']?)(\S+\.xdc)\1', content, re.IGNORECASE
+            )
+        ))
+        open_proj = re.search(r'open_project\s+["\']?([^\s"\'#\n]+\.xpr)["\']?', content)
+
+        if sourced:
+            lines.append(f"Source     : {', '.join(sourced[:5])}")
+            dims.add("RELATION")
+        if xdc_files:
+            lines.append(f"XDC        : {', '.join(xdc_files[:5])}")
+            dims.add("RELATION")
+        if open_proj:
+            lines.append(f"Proje      : {open_proj.group(1)}")
+            dims.add("RELATION")
+
+        # ── WHAT: part / BD adı ───────────────────────────────────────────
+        # Full content'te ara: BD-TCL'de create_bd_design proc içinde olabilir (ilk 4000 char dışı)
+        part_m    = re.search(r'set\s+part_name\s+["\']([^"\']+)["\']', content, re.IGNORECASE)
+        # create_bd_design literal isim veya $değişken ile çağrılabilir
+        bd_name_m = re.search(r'create_bd_design\s+["\']?(\w+)["\']?', content)
+        bd_var_m  = re.search(r'create_bd_design\s+\$(\w+)', content)
+        # board_part: set_property board_part <board> -objects [current_project]
+        board_m   = re.search(r'set_property\s+board_part\s+["\']?([^\s"\']+)["\']?', content, re.IGNORECASE)
+
+        if part_m:
+            lines.append(f"Part       : {part_m.group(1)}")
+            dims.add("WHAT")
+        if bd_name_m:
+            lines.append(f"BD Design  : {bd_name_m.group(1)}")
+            dims.add("WHAT")
+        elif bd_var_m:
+            # $değişken kullanımı — değişkenin atandığı satırdan gerçek değeri al
+            var_name = bd_var_m.group(1)
+            val_m = re.search(
+                rf'set\s+{re.escape(var_name)}\s+["\']?(\w+)["\']?', content
+            )
+            bd_val = val_m.group(1) if val_m else var_name
+            lines.append(f"BD Design  : {bd_val}")
+            # BD definition script olduğunu HOW boyutuna da ekle
+            lines.append(f"Çalıştırma : source {stem}.tcl (Vivado IP Integrator BD definition script)")
+            dims.add("WHAT")
+            dims.add("HOW")
+        if board_m:
+            lines.append(f"Board      : {board_m.group(1)}")
+            dims.add("WHAT")
+
+        if not lines:
+            return None
+
+        dim_str = " ".join(sorted(dims))
+        header = f"[Meta — {stem}.tcl]\n" + "\n".join(lines)
+
+        return SourceChunk(
+            chunk_id=f"{stem}_meta",
+            content=header,
+            file_path=file_path,
+            file_type="tcl",
+            project=project,
+            start_line=1,
+            end_line=1,
+            chunk_label=f"{stem} (meta)",
+            related_node_ids=node_ids,
+            dim=dim_str,
+            is_meta=1,
+        )
 
     # ---------------------------------------------------------------
     # Semantic summary generators — index time, no LLM, pure regex
@@ -194,7 +361,7 @@ class SourceFileChunker:
                         for vlnv, name in ips[:6]]
             parts.append("[IP Instances]\n" + "\n".join(ip_lines))
         if cfgs:
-            cfg_lines = [f"  {k} = {v}" for k, v in cfgs[:12]]
+            cfg_lines = [f"  {k} = {v}" for k, v in cfgs]
             parts.append("[IP Configuration]\n" + "\n".join(cfg_lines))
         if addrs:
             parts.append("[Address Map]\n" + "\n".join(f"  offset {a}" for a in addrs[:8]))
@@ -326,28 +493,36 @@ class SourceFileChunker:
         fname = path.name
 
         if ext in (".v", ".sv"):
-            return self._chunk_verilog(content, file_path, project, related_node_ids or [])
+            chunks = self._chunk_verilog(content, file_path, project, related_node_ids or [])
         elif ext in (".vhd", ".vhdl"):
-            return self._chunk_vhdl(content, file_path, project, related_node_ids or [])
+            chunks = self._chunk_vhdl(content, file_path, project, related_node_ids or [])
         elif ext in (".c", ".cpp"):
-            return self._chunk_c(content, file_path, project, related_node_ids or [])
+            chunks = self._chunk_c(content, file_path, project, related_node_ids or [])
         elif ext in (".h", ".hpp"):
-            return self._chunk_header(content, file_path, project, related_node_ids or [])
+            chunks = self._chunk_header(content, file_path, project, related_node_ids or [])
         elif ext == ".xdc":
-            return self._chunk_xdc(content, file_path, project, related_node_ids or [])
+            chunks = self._chunk_xdc(content, file_path, project, related_node_ids or [])
         elif ext == ".tcl":
-            return self._chunk_tcl(content, file_path, project, related_node_ids or [])
+            chunks = self._chunk_tcl(content, file_path, project, related_node_ids or [])
         elif ext == ".json" and "bd" in fname.lower():
-            return self._chunk_bd_json(content, file_path, project, related_node_ids or [])
+            chunks = self._chunk_bd_json(content, file_path, project, related_node_ids or [])
         elif ext == ".pdf":
-            return self._chunk_pdf(file_path, project, related_node_ids or [])
+            chunks = self._chunk_pdf(file_path, project, related_node_ids or [])
         elif ext == ".prj":
-            return self._chunk_mig_prj(content, file_path, project, related_node_ids or [])
+            chunks = self._chunk_mig_prj(content, file_path, project, related_node_ids or [])
         elif ext in (".md", ".txt"):
-            return self._chunk_text(content, file_path, ext.lstrip("."), project, related_node_ids or [])
+            chunks = self._chunk_text(content, file_path, ext.lstrip("."), project, related_node_ids or [])
         else:
-            return self._chunk_default(content, file_path, ext.lstrip(".") or "text",
-                                       project, related_node_ids or [])
+            chunks = self._chunk_default(content, file_path, ext.lstrip(".") or "text",
+                                         project, related_node_ids or [])
+
+        # Prefix chunk IDs with project to avoid cross-project collisions when
+        # multiple projects contain identically-named files (e.g. design_1.tcl).
+        proj_prefix = re.sub(r'[^\w]', '_', project)
+        for c in chunks:
+            if not c.chunk_id.startswith(proj_prefix + "_"):
+                c.chunk_id = f"{proj_prefix}_{c.chunk_id}"
+        return chunks
 
     # ------------------------------------------------------------------
     # Verilog / SystemVerilog — module sınırı
@@ -648,6 +823,61 @@ class SourceFileChunker:
     # XDC — küçük dosyalar → tümü; büyük dosyalar → pin grupları
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _xdc_file_summary(content: str, file_name: str, sections: List[str]) -> str:
+        """
+        Büyük XDC dosyaları için DOSYA DÜZEYİ özet chunk içeriği üret.
+        Her section'ın aktif/yorumlu durumunu özetler.
+        W10 fix: LLM tek "0 aktif" chunk'tan tüm dosyayı yanlış değerlendirmesin.
+        """
+        stem = re.sub(r'[^\w]', '_', Path(file_name).stem)
+
+        # Dosya genelinde aktif pin sayısı
+        active_re = re.compile(
+            r'^(?!#)\s*(?:set_property|create_clock)',
+            re.MULTILINE | re.IGNORECASE,
+        )
+        commented_re = re.compile(
+            r'^\s*#.*set_property',
+            re.MULTILINE | re.IGNORECASE,
+        )
+        total_active = len(active_re.findall(content))
+        total_commented = len(commented_re.findall(content))
+
+        # Section başına aktif pin var mı?
+        active_sections = []
+        commented_sections = []
+        section_split_re = re.compile(r'(?m)^##\s*|^#(?=[A-Z])')
+        for sec in sections:
+            if not sec.strip():
+                continue
+            first_line = sec.split("\n")[0].strip()
+            label = re.sub(r'[^\w\s/]', '', first_line)[:40] or "?"
+            sec_active = len(active_re.findall(sec))
+            if sec_active > 0:
+                active_sections.append(f"{label} ({sec_active} aktif pin)")
+            else:
+                commented_sections.append(label)
+
+        lines = [
+            f"[{file_name} — Dosya Özeti]",
+            f"Toplam: {total_active} aktif constraint, {total_commented} yorumlu (#) constraint.",
+            "",
+        ]
+        if active_sections:
+            lines.append("AKTİF BÖLÜMLER (gerçek pin ataması olan):")
+            for s in active_sections:
+                lines.append(f"  + {s}")
+        else:
+            lines.append("Bu dosyada hiçbir aktif constraint yok — tümü yorumlu (#).")
+        if commented_sections:
+            lines.append(f"TAMAMEN YORUMLU bölümler ({len(commented_sections)} adet): "
+                         + ", ".join(commented_sections[:8])
+                         + ("..." if len(commented_sections) > 8 else ""))
+        lines.append("")
+        lines.append("(Aktif pin detayları için ilgili bölüm chunk'larına bakın.)")
+        return "\n".join(lines)
+
     def _chunk_xdc(self, content: str, file_path: str, project: str,
                    node_ids: List[str]) -> List[SourceChunk]:
         # Her XDC chunk'ına pin özeti ekle (index-time semantic enrichment)
@@ -662,8 +892,35 @@ class SourceFileChunker:
         # Ayrıca "#PWM Audio Amplifier" gibi tek-hash subsection başlıkları da bölünüyor:
         # ^#(?=[A-Z]) — tek # + büyük harf (commented set_property'ler küçük harf ile başlar)
         fname = Path(file_path).name
+        stem = Path(file_path).stem
         chunks = []
         sections = re.split(r'(?m)^##\s*|^#(?=[A-Z])', content)  # original content ile böl
+
+        # W10 fix: Dosya düzeyinde özet chunk — LLM hangi bölümlerin aktif olduğunu bilir
+        file_summary_content = self._xdc_file_summary(content, fname, sections)
+        chunks.append(SourceChunk(
+            chunk_id=f"{stem}_file_summary",
+            content=file_summary_content,
+            file_path=file_path,
+            file_type="xdc",
+            project=project,
+            start_line=1,
+            end_line=content.count("\n") + 1,
+            chunk_label=f"{fname} dosya özeti",
+            related_node_ids=node_ids,
+        ))
+
+        # G1: Dosya genelinde aktif/yorumlu constraint sayısı — her section chunk'ına eklenir
+        _active_re = re.compile(r'^(?!#)\s*(?:set_property|create_clock)', re.MULTILINE | re.IGNORECASE)
+        _cmt_re = re.compile(r'^\s*#.*set_property', re.MULTILINE | re.IGNORECASE)
+        total_active = len(_active_re.findall(content))
+        total_commented = len(_cmt_re.findall(content))
+        file_ctx_line = (
+            f"[{fname} — Dosya geneli: {total_active} aktif, "
+            f"{total_commented} yorumlu constraint. "
+            f"Yalnızca aktif olanlar geçerlidir.]\n"
+        )
+
         for i, sec in enumerate(sections):
             if not sec.strip():
                 continue
@@ -673,9 +930,10 @@ class SourceFileChunker:
             end_line = start_line + sec.count("\n")
             # Her section'a o section'ın pin özetini ekle
             sec_summary = self._xdc_pin_summary(sec, fname)
-            sec_enriched = (sec_summary + sec) if sec_summary else sec
+            # G1: Her chunk dosya genelini biliyor — LLM tek "0 aktif" bölümden yanılmaz
+            sec_enriched = file_ctx_line + ((sec_summary + sec) if sec_summary else sec)
             chunks.append(SourceChunk(
-                chunk_id=f"{Path(file_path).stem}_{i}_{label.replace(' ','_')}",
+                chunk_id=f"{stem}_{i}_{label.replace(' ','_')}",
                 content=sec_enriched[:MAX_CHUNK_CHARS],
                 file_path=file_path,
                 file_type="xdc",
@@ -694,8 +952,12 @@ class SourceFileChunker:
 
     def _chunk_tcl(self, content: str, file_path: str, project: str,
                    node_ids: List[str]) -> List[SourceChunk]:
+        # Meta chunk her zaman üret (küçük dosyalar dahil)
+        meta = self._tcl_meta_chunk(content, file_path, project, node_ids)
+
         if len(content) <= MAX_CHUNK_CHARS:
-            return self._whole_file_chunk(content, file_path, "tcl", project, node_ids)
+            chunks = self._whole_file_chunk(content, file_path, "tcl", project, node_ids)
+            return ([meta] + chunks) if meta else chunks
 
         stem = Path(file_path).stem
 
@@ -865,7 +1127,7 @@ class SourceFileChunker:
                         ))
 
             if chunks:
-                return chunks
+                return ([meta] + chunks) if meta else chunks
 
         # ── Strategy 2: ADIM / Step / #### separators ────────────────────────
         chunks = []
@@ -909,8 +1171,9 @@ class SourceFileChunker:
                     related_node_ids=node_ids,
                 ))
 
-        return chunks if chunks else self._chunk_default(
+        content_chunks = chunks if chunks else self._chunk_default(
             content, file_path, "tcl", project, node_ids)
+        return ([meta] + content_chunks) if meta else content_chunks
 
     # ------------------------------------------------------------------
     # BD JSON — IP bloklarına göre
@@ -1102,7 +1365,14 @@ class SourceFileChunker:
     def _chunk_text(self, content: str, file_path: str, file_type: str,
                     project: str, node_ids: List[str]) -> List[SourceChunk]:
         if len(content) <= MAX_CHUNK_CHARS:
-            return self._whole_file_chunk(content, file_path, file_type, project, node_ids)
+            chunks = self._whole_file_chunk(content, file_path, file_type, project, node_ids)
+            if file_path.lower().endswith(".md") and chunks:
+                # Tag the single chunk with the first heading's dim
+                first_line = content.split("\n")[0].strip("# \t─-=")[:50]
+                d = self._readme_heading_dim(first_line)
+                if d:
+                    chunks[0].dim = d
+            return chunks
 
         chunks = []
         stem = Path(file_path).stem
@@ -1113,6 +1383,8 @@ class SourceFileChunker:
                      if '|' not in content[m.start():m.end()]]
         positions.append(len(content))
 
+        is_readme = file_path.lower().endswith(".md")
+
         for i in range(len(positions) - 1):
             sec = content[positions[i]:positions[i+1]].strip()
             if len(sec) < 20:
@@ -1121,6 +1393,7 @@ class SourceFileChunker:
             label = re.sub(r'[^\w\s]', '', first_line) or f"section_{i}"
             start_line = content[:positions[i]].count("\n") + 1
             end_line = content[:positions[i+1]].count("\n") + 1
+            dim = self._readme_heading_dim(first_line) if is_readme else ""
 
             if len(sec) > MAX_CHUNK_CHARS:
                 for j, sub in enumerate(self._split_text(sec)):
@@ -1131,6 +1404,7 @@ class SourceFileChunker:
                         project=project, start_line=start_line, end_line=end_line,
                         chunk_label=f"{label} (part {j+1})",
                         related_node_ids=node_ids,
+                        dim=dim,
                     ))
             else:
                 chunks.append(SourceChunk(
@@ -1140,6 +1414,7 @@ class SourceFileChunker:
                     project=project, start_line=start_line, end_line=end_line,
                     chunk_label=label,
                     related_node_ids=node_ids,
+                    dim=dim,
                 ))
 
         return chunks if chunks else self._chunk_default(content, file_path, file_type, project, node_ids)
@@ -1397,6 +1672,106 @@ class SourceFileChunker:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Signal extractor — index zamanında otomatik proje keyword çıkarımı
+# ─────────────────────────────────────────────────────────────────────────────
+
+_SKIP_LABELS = frozenset({
+    "address_map", "net_connections", "net_connections_1",
+    "header", "preamble", "write_mig", "manifest",
+    "includes_defines_typedefs", "global_vars", "typedef_struct",
+    "get_script_folder",
+})
+_SKIP_FT_LABELS = frozenset({"xdc", "md", "pdf"})  # label kalitesiz
+_SKIP_STEMS = frozenset({
+    "readme", "run_synthesis", "manifest", "design_1",
+    "synthesis_simple",
+})
+
+# Vivado workflow AŞAMA adları — proje kimliği değil, işlem adımı.
+# Bu terimler kaynak kodda geçse bile hiçbir projeye özgü değildir,
+# routing için sinyal olarak kullanılmamalıdır.
+_GENERIC_VIVADO_TERMS = frozenset({
+    "implementation", "impl",
+    "synthesis", "synth",
+    "bitstream",
+    "simulation", "simulate",
+    "route", "routing",
+    "placement",
+    "timing",
+    "generate", "compile",
+    "build", "run",
+    "wrapper", "top",
+    "module", "design",
+})
+
+# TCL create_bd_cell IP adı pattern
+_TCL_IP_RE = re.compile(
+    r'create_bd_cell\s+-type\s+ip[^"]+?-vlnv\s+\S+:(\S+):\S+\s+(\S+)',
+    re.IGNORECASE,
+)
+
+
+def _extract_signals_from_items(items: List[Dict]) -> List[Dict[str, str]]:
+    """
+    Chunk item listesinden proje tanımlayıcı keyword'ler çıkar.
+
+    3 kaynak:
+      1. chunk_label (tek kelime, uygun file_type)  → IP instance / modül / fonksiyon adı
+      2. file_path stem                              → script/file adı (create_gtx_ddr_mb vb.)
+      3. TCL create_bd_cell içeriği                 → IP türü (aurora_8b10b, axi_iic vb.)
+
+    Tekrar eden (keyword, project) çiftleri FTS5 UPSERT ile sessizce atlanır.
+    """
+    signals: List[Dict[str, str]] = []
+
+    for item in items:
+        proj = item.get("project", "").strip()
+        if not proj:
+            continue
+
+        ft    = item.get("file_type", "").strip()
+        label = item.get("chunk_label", "").strip()
+        fp    = item.get("file_path", "").strip()
+        content = item.get("content", "")
+
+        # ── Kaynak 1: chunk_label ────────────────────────────────────────────
+        if label and ft not in _SKIP_FT_LABELS:
+            lbl_lower = label.lower()
+            if (lbl_lower not in _SKIP_LABELS
+                    and lbl_lower not in _GENERIC_VIVADO_TERMS
+                    and not lbl_lower.startswith("lines ")
+                    and not lbl_lower.startswith("declarations_after_line")
+                    and " " not in lbl_lower
+                    and len(lbl_lower) >= 4):
+                signals.append({"keyword": lbl_lower, "project": proj,
+                                 "source": f"label_{ft}"})
+                # Version-stripped form: axi_dma_0 → axi_dma
+                stripped = re.sub(r'_\d+$', '', lbl_lower)
+                if stripped != lbl_lower and len(stripped) >= 4:
+                    signals.append({"keyword": stripped, "project": proj,
+                                     "source": "label_stripped"})
+
+        # ── Kaynak 2: dosya adı stem ─────────────────────────────────────────
+        if fp:
+            stem = Path(fp).stem.lower()
+            if (stem and len(stem) >= 5
+                    and stem not in _SKIP_STEMS
+                    and stem not in _GENERIC_VIVADO_TERMS):
+                signals.append({"keyword": stem, "project": proj,
+                                 "source": "file_stem"})
+
+        # ── Kaynak 3: TCL create_bd_cell IP türü ────────────────────────────
+        if ft == "tcl" and content:
+            for m in _TCL_IP_RE.finditer(content):
+                ip_name = m.group(1).lower()   # xilinx.com:ip:aurora_8b10b:11.0 → aurora_8b10b
+                if len(ip_name) >= 4 and ip_name not in _GENERIC_VIVADO_TERMS:
+                    signals.append({"keyword": ip_name, "project": proj,
+                                     "source": "tcl_ip"})
+
+    return signals
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SourceChunkStore
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1427,160 +1802,74 @@ class SourceChunkStore:
         self._collection = None
         self._embedder = None
         self._chunker = SourceFileChunker()
-        # BM25 index — lazy build, disk-cached, invalidate on add/reset
-        self._bm25 = None
-        self._bm25_ids: List[str] = []
-        self._bm25_metas: List[Dict] = []
-        self._bm25_docs: List[str] = []
-        # Disk cache path: persist_directory/bm25_cache.pkl
-        self._bm25_cache_path = Path(persist_directory) / "bm25_cache.pkl"
+        # FTS5 keyword index — disk-persistent, incremental, zero cold-start
+        _fts_db = Path(persist_directory).parent / "fts5_source.db"
+        self._fts = FTS5Index(str(_fts_db))
+        self._fts_synced = False  # backfill yapıldı mı?
 
     # ------------------------------------------------------------------
-    # BM25 tokenizer ve index
+    # FTS5 keyword index
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _bm25_tokenize(text: str) -> List[str]:
+    def _ensure_fts5(self):
         """
-        BM25 için tokenize et.
-        - Alfanumerik + alt çizgi token'larını ayır (PACKAGE_PIN, spi_mosi, AB22)
-        - Alt çizgili token'ları da parçalara böl (spi_mosi → spi, mosi)
-        - Küçük harf: PACKAGE_PIN = package_pin = Package_Pin
+        FTS5 index ChromaDB ile senkron mu kontrol et.
+        Değilse ChromaDB'den tek seferlik backfill yap (~1-2 saniye, 1000 chunk için).
+        Backfill sonrası her add_chunks() FTS5'i incremental günceller → cold-start yok.
         """
-        full = re.findall(r'[a-zA-Z0-9_]+', text.lower())
-        tokens: List[str] = []
-        for t in full:
-            tokens.append(t)
-            if '_' in t:
-                tokens.extend(p for p in t.split('_') if p)
-        return tokens
-
-    def _ensure_bm25(self):
-        """
-        BM25 index yoksa kur; önce disk cache'ten yükle, yoksa ChromaDB'den sıfırdan kur.
-        100+ proje için kritik: 960+ chunk için yeniden tokenize etmek ~2-3 saniye sürebilir.
-        Disk cache ile bu maliyet sadece ilk indexlemede ödenir.
-        """
-        try:
-            from rank_bm25 import BM25Okapi
-        except ImportError:
-            return  # rank-bm25 yüklü değilse sessizce atla
-
+        if self._fts_synced:
+            return
         col = self._get_collection()
-        db_count = col.count()
-        if db_count == 0:
+        chroma_count = col.count()
+        if chroma_count == 0:
+            self._fts_synced = True
             return
-
-        # In-memory cache hâlâ geçerliyse atla
-        if self._bm25 is not None and len(self._bm25_ids) == db_count:
+        fts_count = self._fts.count()
+        if fts_count == chroma_count:
+            self._fts_synced = True
             return
-
-        # ── Disk cache'ten yükle ─────────────────────────────────────────────
-        if self._bm25_cache_path.exists():
-            import pickle
-            try:
-                with open(self._bm25_cache_path, "rb") as f:
-                    cached = pickle.load(f)
-                if cached.get("count") == db_count:
-                    self._bm25_ids   = cached["ids"]
-                    self._bm25_metas = cached["metas"]
-                    self._bm25_docs  = cached["docs"]
-                    self._bm25       = BM25Okapi(cached["tokenized"])
-                    return  # Cache geçerli, yeniden kurmaya gerek yok
-            except Exception:
-                pass  # Bozuk cache → sıfırdan kur
-
-        # ── ChromaDB'den sıfırdan kur ────────────────────────────────────────
-        data = col.get(include=["documents", "metadatas"])
-        self._bm25_ids   = data.get("ids", [])
-        self._bm25_metas = data.get("metadatas", [])
-        self._bm25_docs  = data.get("documents", [])
-        tokenized = [self._bm25_tokenize(doc) for doc in self._bm25_docs]
-        self._bm25 = BM25Okapi(tokenized)
-
-        # Disk'e kaydet
-        import pickle
-        try:
-            self._bm25_cache_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self._bm25_cache_path, "wb") as f:
-                pickle.dump({
-                    "count":     db_count,
-                    "ids":       self._bm25_ids,
-                    "metas":     self._bm25_metas,
-                    "docs":      self._bm25_docs,
-                    "tokenized": tokenized,
-                }, f)
-        except Exception:
-            pass  # Disk yazma hatası kritik değil — in-memory index hâlâ çalışır
-
-    def _invalidate_bm25(self):
-        """Yeni chunk eklenince veya reset'te BM25 index'i hem RAM'den hem diskten sıfırla."""
-        self._bm25 = None
-        self._bm25_ids = []
-        self._bm25_metas = []
-        self._bm25_docs = []
-        # Disk cache geçersiz → sil, sonraki search'te yeniden build edilecek
-        if self._bm25_cache_path.exists():
-            try:
-                self._bm25_cache_path.unlink()
-            except Exception:
-                pass
-
-    def _bm25_search(
-        self,
-        query: str,
-        n_results: int,
-        project_filter: Optional[str],
-        file_type_filter: Optional[str],
-    ) -> List[Dict[str, Any]]:
-        """
-        BM25 keyword arama — filtrelenmiş alt küme üzerinde çalışır.
-        Döndürülen dict'ler semantic search ile aynı yapıda; similarity yerine bm25_score.
-        """
-        self._ensure_bm25()
-        if self._bm25 is None or not self._bm25_ids:
-            return []
-
-        # Filtre uygula
-        indices = [
-            i for i, m in enumerate(self._bm25_metas)
-            if (not project_filter or m.get("project") == project_filter)
-            and (not file_type_filter or m.get("file_type") == file_type_filter)
-        ]
-        if not indices:
-            return []
-
-        # BM25 skorlarını sadece filtrelenmiş subset üzerinde hesapla
-        query_tokens = self._bm25_tokenize(query)
-        # BM25Okapi.get_batch_scores subset için
-        scores = self._bm25.get_batch_scores(query_tokens, indices)
-
-        # (score, global_index) çiftleri, azalan sırada
-        ranked = sorted(zip(scores, indices), key=lambda x: x[0], reverse=True)
-
-        results = []
-        for score, idx in ranked[:n_results]:
-            if score <= 0:
+        # Backfill: ChromaDB → FTS5 (sayfalı — SQLite variable limiti aşılmaz)
+        print(f"  [FTS5] Backfill başlıyor: {chroma_count} chunk ChromaDB → FTS5 ...")
+        self._fts.reset()
+        _PAGE = 2000  # ChromaDB col.get() sayfa boyutu
+        offset = 0
+        all_items: List[Dict] = []
+        while True:
+            data = col.get(include=["documents", "metadatas"],
+                           limit=_PAGE, offset=offset)
+            ids   = data.get("ids", [])
+            docs  = data.get("documents", [])
+            metas = data.get("metadatas", [])
+            if not ids:
                 break
-            meta = self._bm25_metas[idx]
-            node_ids_raw = meta.get("related_node_ids", "[]")
-            try:
-                node_ids = json.loads(node_ids_raw) if node_ids_raw else []
-            except Exception:
-                node_ids = []
-            results.append({
-                "chunk_id":        meta.get("chunk_id", ""),
-                "content":         self._bm25_docs[idx],
-                "file_path":       meta.get("file_path", ""),
-                "file_type":       meta.get("file_type", ""),
-                "project":         meta.get("project", ""),
-                "start_line":      meta.get("start_line", 0),
-                "end_line":        meta.get("end_line", 0),
-                "chunk_label":     meta.get("chunk_label", ""),
-                "similarity":      round(score, 4),   # BM25 raw score
-                "related_node_ids": node_ids,
-            })
-        return results
+            for cid, doc, meta in zip(ids, docs, metas):
+                try:
+                    rni = json.loads(meta.get("related_node_ids", "[]") or "[]")
+                except Exception:
+                    rni = []
+                all_items.append({
+                    "chunk_id":         cid,
+                    "content":          doc,
+                    "project":          meta.get("project", ""),
+                    "file_type":        meta.get("file_type", ""),
+                    "file_path":        meta.get("file_path", ""),
+                    "start_line":       meta.get("start_line", 0),
+                    "end_line":         meta.get("end_line", 0),
+                    "chunk_label":      meta.get("chunk_label", ""),
+                    "related_node_ids": rni,
+                })
+            offset += _PAGE
+            if len(ids) < _PAGE:
+                break
+        self._fts.add_batch(all_items)
+        # Sinyalleri de backfill et (tüm projeler için)
+        all_signals = _extract_signals_from_items(all_items)
+        if all_signals:
+            self._fts.add_signals(all_signals)
+            print(f"  [FTS5] {len(all_signals)} sinyal kaydedildi, "
+                  f"{len(self._fts.get_unique_signals())} proje-özgün")
+        print(f"  [FTS5] Backfill tamamlandı: {self._fts.count()} chunk")
+        self._fts_synced = True
 
     @staticmethod
     def _rrf_merge(
@@ -1618,15 +1907,8 @@ class SourceChunkStore:
 
     def _get_embedder(self):
         if self._embedder is None:
-            from rag_v2.vector_store_v2 import VectorStoreV2
-            # VectorStoreV2'nin embedder'ını paylaş
-            tmp = VectorStoreV2.__new__(VectorStoreV2)
-            tmp._embedder = None
-            from sentence_transformers import SentenceTransformer
-            import os
-            # CUDA 12.1 > PyTorch max 12.0 — force CPU to avoid hang
-            os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
-            self._embedder = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2", device="cpu")
+            from rag_v2 import embedder
+            self._embedder = embedder
         return self._embedder
 
     def _get_collection(self):
@@ -1643,8 +1925,8 @@ class SourceChunkStore:
         return self._get_collection().count()
 
     def embed_texts(self, texts: List[str]) -> List[List[float]]:
-        embedder = self._get_embedder()
-        return embedder.encode(texts, batch_size=16, show_progress_bar=False).tolist()
+        from rag_v2.embedder import embed_texts as _embed_texts
+        return _embed_texts(texts)
 
     def add_chunks(self, chunks: List[SourceChunk], batch_size: int = 32) -> int:
         """Chunk'ları ChromaDB'ye ekle (upsert)."""
@@ -1677,7 +1959,26 @@ class SourceChunkStore:
             except Exception as e:
                 print(f"  [SourceChunkStore] Batch hata: {e}")
 
-        self._invalidate_bm25()   # yeni chunk'lar → BM25 yeniden kurulacak
+        # FTS5'e incremental ekle (cold-start yok, full rebuild gerekmez)
+        fts_items = []
+        for c in chunks:
+            fts_items.append({
+                "chunk_id":         c.chunk_id,
+                "content":          c.content,
+                "project":          c.project,
+                "file_type":        c.file_type,
+                "file_path":        c.file_path,
+                "start_line":       c.start_line,
+                "end_line":         c.end_line,
+                "chunk_label":      c.chunk_label,
+                "related_node_ids": c.related_node_ids,
+            })
+        self._fts.add_batch(fts_items)
+        # Sinyal extraction: label + dosya adı + TCL IP → routing için keyword deposu
+        signals = _extract_signals_from_items(fts_items)
+        if signals:
+            self._fts.add_signals(signals)
+        self._fts_synced = True
         return stored
 
     def add_file(
@@ -1767,20 +2068,36 @@ class SourceChunkStore:
         except Exception as e:
             print(f"  [SourceChunkStore] Semantic search hata: {e}")
 
-        # ── 2. BM25 search ───────────────────────────────────────────────────
-        bm25_hits = self._bm25_search(query, n_candidates, project_filter, file_type_filter)
+        # ── 2. FTS5 BM25 search ──────────────────────────────────────────────
+        self._ensure_fts5()
+        fts_raw = self._fts.search(
+            query, n_candidates,
+            project=project_filter,
+            file_type=file_type_filter,
+        )
+        bm25_hits: List[Dict[str, Any]] = []
+        for h in fts_raw:
+            bm25_hits.append({
+                "chunk_id":         h["chunk_id"],
+                "content":          h["content"],
+                "file_path":        h["file_path"],
+                "file_type":        h["file_type"],
+                "project":          h["project"],
+                "start_line":       h["start_line"],
+                "end_line":         h["end_line"],
+                "chunk_label":      h["chunk_label"],
+                "similarity":       h["bm25_score"],
+                "related_node_ids": h["related_node_ids"],
+            })
 
         # ── 3. RRF merge ─────────────────────────────────────────────────────
         if bm25_hits:
             merged = self._rrf_merge(semantic_hits, bm25_hits, n_results, self._RRF_K)
-            # BM25 rank-1 garantisi: BM25'in en iyi eşleşmesi her zaman context'e girer.
-            # Exact-keyword sorgularında (PIN adı, parametre adı, komut adı) kritik.
-            bm25_top = bm25_hits[0]
-            bm25_top_id = bm25_top["chunk_id"]
+            # FTS5 rank-1 garantisi: en iyi keyword eşleşmesi her zaman context'e girer.
+            bm25_top_id = bm25_hits[0]["chunk_id"]
             if bm25_top_id not in {h["chunk_id"] for h in merged}:
-                merged.append(bm25_top)
+                merged.append(bm25_hits[0])
             return merged
-        # BM25 yoksa (rank-bm25 kurulmamış) → sadece semantic
         return semantic_hits[:n_results]
 
     def search_within_file(
@@ -1798,26 +2115,55 @@ class SourceChunkStore:
         col = self._get_collection()
         if col.count() == 0:
             return []
+        # Phase 0b: İki aşamalı fetch — önce yalnızca metadata (document yok),
+        # eşleşen ID'ler bulunduktan sonra sadece onların document'ı çekilir.
+        # 100K chunk'ta tüm koleksiyonu RAM'e çekmek yerine ~3x daha az veri transferi.
+        # Tüm koleksiyonu tek seferde çekince SQLite variable limit (32766) aşılıyor.
+        # 5000'lik sayfalama ile her batch limit içinde kalır.
+        _PAGE = 5000
+        all_ids_flat: List[str] = []
+        all_metas_flat: List[Dict] = []
+        offset = 0
         try:
-            all_data = col.get(include=["documents", "metadatas"])
+            while True:
+                batch = col.get(include=["metadatas"], limit=_PAGE, offset=offset)
+                batch_ids = batch.get("ids", [])
+                if not batch_ids:
+                    break
+                all_ids_flat.extend(batch_ids)
+                all_metas_flat.extend(batch.get("metadatas", []))
+                offset += len(batch_ids)
+                if len(batch_ids) < _PAGE:
+                    break
         except Exception as e:
             print(f"  [SourceChunkStore] search_within_file get hata: {e}")
             return []
 
-        # Bu dosyaya ait chunk ID'lerini ve metadata'larını topla
         stem_lower = file_stem.lower()
         file_ids: List[str] = []
+        for cid, meta in zip(all_ids_flat, all_metas_flat):
+            if stem_lower in Path(meta.get("file_path", "")).stem.lower():
+                file_ids.append(cid)
+
+        if not file_ids:
+            return []
+
+        # Yalnızca eşleşen ID'lerin document + metadata'sını çek
+        try:
+            matched = col.get(ids=file_ids, include=["documents", "metadatas"])
+        except Exception as e:
+            print(f"  [SourceChunkStore] search_within_file fetch hata: {e}")
+            return []
+
         file_docs: Dict[str, str] = {}
         file_metas: Dict[str, Dict] = {}
         for cid, doc, meta in zip(
-            all_data.get("ids", []),
-            all_data.get("documents", []),
-            all_data.get("metadatas", []),
+            matched.get("ids", []),
+            matched.get("documents", []),
+            matched.get("metadatas", []),
         ):
-            if stem_lower in Path(meta.get("file_path", "")).stem.lower():
-                file_ids.append(cid)
-                file_docs[cid] = doc
-                file_metas[cid] = meta
+            file_docs[cid] = doc
+            file_metas[cid] = meta
 
         if not file_ids:
             return []
@@ -1899,14 +2245,41 @@ class SourceChunkStore:
         col = self._get_collection()
         if col.count() == 0:
             return []
+        # Phase 0b: İki aşamalı fetch — sayfalı (SQLite variable limit aşımını önler)
+        _PAGE = 5000
+        all_ids_flat: List[str] = []
+        all_metas_flat: List[Dict] = []
+        offset = 0
         try:
-            all_data = col.get(include=["documents", "metadatas"])
+            while True:
+                batch = col.get(include=["metadatas"], limit=_PAGE, offset=offset)
+                batch_ids = batch.get("ids", [])
+                if not batch_ids:
+                    break
+                all_ids_flat.extend(batch_ids)
+                all_metas_flat.extend(batch.get("metadatas", []))
+                offset += len(batch_ids)
+                if len(batch_ids) < _PAGE:
+                    break
         except Exception as e:
             print(f"  [SourceChunkStore] search_by_filename hata: {e}")
             return []
 
-        results = []
         stem_lower = file_stem.lower()
+        matched_ids = [
+            cid for cid, meta in zip(all_ids_flat, all_metas_flat)
+            if stem_lower in Path(meta.get("file_path", "")).stem.lower()
+        ]
+        if not matched_ids:
+            return []
+
+        try:
+            all_data = col.get(ids=matched_ids, include=["documents", "metadatas"])
+        except Exception as e:
+            print(f"  [SourceChunkStore] search_by_filename fetch hata: {e}")
+            return []
+
+        results = []
         for doc, meta in zip(all_data.get("documents", []), all_data.get("metadatas", [])):
             fp = meta.get("file_path", "")
             if stem_lower in Path(fp).stem.lower():
@@ -1927,6 +2300,48 @@ class SourceChunkStore:
                     "similarity": 1.0,   # dosya adı eşleşmesi → en yüksek öncelik
                     "related_node_ids": node_ids,
                 })
+        return results
+
+    def get_meta_chunks(self, project: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        is_meta=1 flagli chunk'ları döndür (TCL meta chunk'ları).
+        HOW sorgularında proje kurulum bağlamını garantili olarak getirmek için kullanılır.
+        project verilirse o projeyle sınırla; None → tüm projeler.
+        """
+        col = self._get_collection()
+        if col.count() == 0:
+            return []
+        try:
+            if project:
+                where = {"$and": [{"is_meta": {"$eq": 1}}, {"project": {"$eq": project}}]}
+            else:
+                where = {"is_meta": {"$eq": 1}}
+            data = col.get(where=where, include=["documents", "metadatas"])
+        except Exception as e:
+            print(f"  [SourceChunkStore] get_meta_chunks hata: {e}")
+            return []
+
+        results = []
+        for doc, meta in zip(data.get("documents", []), data.get("metadatas", [])):
+            node_ids_raw = meta.get("related_node_ids", "[]")
+            try:
+                node_ids = json.loads(node_ids_raw) if node_ids_raw else []
+            except Exception:
+                node_ids = []
+            results.append({
+                "chunk_id": meta.get("chunk_id", ""),
+                "content": doc,
+                "file_path": meta.get("file_path", ""),
+                "file_type": meta.get("file_type", ""),
+                "project": meta.get("project", ""),
+                "start_line": meta.get("start_line", 0),
+                "end_line": meta.get("end_line", 0),
+                "chunk_label": meta.get("chunk_label", ""),
+                "dim": meta.get("dim", ""),
+                "is_meta": meta.get("is_meta", 1),
+                "similarity": 1.0,
+                "related_node_ids": node_ids,
+            })
         return results
 
     def enumerate_project_chunks(
@@ -1964,17 +2379,24 @@ class SourceChunkStore:
         ids = result.get("ids", [])
         if ids:
             col.delete(ids=ids)
-        self._invalidate_bm25()
+        self._fts.delete_by_file_path(file_path)
         return len(ids)
 
     def reset(self):
-        """Koleksiyonu sil ve yeniden oluştur."""
-        import chromadb
-        client = chromadb.PersistentClient(path=self.persist_directory)
-        try:
-            client.delete_collection(self.COLLECTION_NAME)
-        except Exception:
-            pass
+        """Koleksiyonu sil ve yeniden oluştur.
+
+        ChromaDB PersistentClient ile delete_collection + aynı client ile
+        get_or_create_collection yapmak yerine disk dizinini doğrudan siliyoruz.
+        Böylece iki farklı client nesnesinin tutarsız state bırakma sorunu önlenir.
+        """
+        import shutil
+        # Tüm in-memory referansları temizle
         self._collection = None
         self._client = None
-        self._invalidate_bm25()
+        # Disk'teki ChromaDB dizinini tamamen sil
+        chroma_path = Path(self.persist_directory)
+        if chroma_path.exists():
+            shutil.rmtree(chroma_path)
+        # FTS5 indeksi sıfırla
+        self._fts.reset()
+        self._fts_synced = False

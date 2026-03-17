@@ -145,37 +145,42 @@ def ask(question: str, router, gate, llm, system_prompt: str, verbose=False) -> 
 
 def test_a(router, gate, llm, sc, system_prompt, verbose) -> Dict:
     """
-    design_1.tcl chunk'larını geçici olarak sil, sorgu yap → "yok" demeli.
+    Nexys-A7-100T-Master.xdc chunk'larını geçici olarak sil, sorgu yap → "yok" demeli.
     Sonra yeniden ekle, sorgu yap → doğru cevap vermeli.
-    """
-    print(hdr("TEST A — Held-Out Dosya (design_1.tcl)"))
 
-    TARGET_FILE = str(_ROOT / "data/code/Nexys-A7-100T-DMA-Audio/src/bd/design_1.tcl")
-    # Ask for address map offsets — these are ONLY in design_1.tcl source chunks,
-    # NOT stored in graph node descriptions (graph has component names/configs, not raw TCL addr segs)
+    Dosya seçimi: Nexys-A7-100T-Master.xdc — UNIQUE isim (50T XDC'den farklı:
+    Nexys-A7-50T-Master.xdc). design_1.tcl Vivado'nun default adı olup birçok
+    projede tekrar eder; unique dosya ile held-out testi daha güvenilir.
+    """
+    print(hdr("TEST A — Held-Out Dosya (Nexys-A7-100T-Master.xdc)"))
+
+    TARGET_FILE = str(_ROOT / "data/code/Nexys-A7-100T-DMA-Audio/src/constraints/Nexys-A7-100T-Master.xdc")
+    TARGET_STEM = "nexys-a7-100t-master"  # chunk_files kontrolü için
+
+    # Nexys A7-100T XDC'de aktif (yorumsuz) PWM audio pin atamaları:
+    #   PACKAGE_PIN A11 → PWM_AUDIO_0_pwm (aud_pwm)
+    #   PACKAGE_PIN D12 → PWM_AUDIO_0_en  (aud_sd)
+    # Bu değerler YALNIZCA bu XDC dosyasında aktif olarak geçer.
     QUESTION_A = (
-        "design_1.tcl BD dosyasında microblaze_0 veri alanı için "
-        "axi_dma_0 S_AXI_LITE register space'inin base offset adresi nedir? "
-        "axi_uartlite_0 S_AXI offset adresini de belirtin. "
-        "Hex adres değerlerini belirtin."
+        "Nexys A7-100T kartında PWM ses amplifikatörü için XDC pin ataması nedir? "
+        "PWM_AUDIO_0_pwm ve PWM_AUDIO_0_en portlarının PACKAGE_PIN ve IOSTANDARD "
+        "değerlerini belirtin."
     )
-    EXPECTED_TERMS = ["0x41e00000", "axi_dma_0", "0x40600000"]
 
     # ── Faz 1: Dosya İNDEKSTE — normal sorgu ────────────────────────────────
-    print(f"\n  {B}Faz 1{RST}: design_1.tcl indekste mevcut")
+    print(f"\n  {B}Faz 1{RST}: Nexys-A7-100T-Master.xdc indekste mevcut")
     r1 = ask(QUESTION_A, router, gate, llm, system_prompt, verbose)
     ans1_lower = r1["answer"].lower()
-    faz1_found_cache = "0x41e00000" in ans1_lower or "41e0" in ans1_lower
-    faz1_found_dma   = "0x40600000" in ans1_lower or "40600000" in ans1_lower or "axi_dma" in ans1_lower
-    faz1_has_chunks  = r1["source_chunks"] > 0
-    faz1_design1_in  = "design_1" in " ".join(r1["chunk_files"]).lower()
+    faz1_found_pin_pwm = "a11" in ans1_lower or "pwm_audio_0_pwm" in ans1_lower
+    faz1_found_pin_en  = "d12" in ans1_lower or "pwm_audio_0_en" in ans1_lower
+    faz1_xdc_in = TARGET_STEM in " ".join(r1["chunk_files"]).lower()
 
-    print(f"    Source chunks : {r1['source_chunks']} (design_1.tcl içeriyor: {faz1_design1_in})")
-    print(f"    DMA addr      : {ok('Bulundu') if faz1_found_cache else err('Bulunamadı')}")
-    print(f"    UART addr     : {ok('Bulundu') if faz1_found_dma else err('Bulunamadı')}")
+    print(f"    Source chunks : {r1['source_chunks']} (100T XDC içeriyor: {faz1_xdc_in})")
+    print(f"    PWM pin (A11) : {ok('Bulundu') if faz1_found_pin_pwm else err('Bulunamadı')}")
+    print(f"    EN  pin (D12) : {ok('Bulundu') if faz1_found_pin_en else err('Bulunamadı')}")
 
     # ── Faz 2: Chunk'ları geçici SİL ────────────────────────────────────────
-    print(f"\n  {B}Faz 2{RST}: design_1.tcl chunk'ları siliniyor (held-out simülasyonu)")
+    print(f"\n  {B}Faz 2{RST}: Nexys-A7-100T-Master.xdc chunk'ları siliniyor (held-out simülasyonu)")
     held_out_count = sc.delete_by_filepath(TARGET_FILE)
     held_out_ids = ['placeholder'] * held_out_count  # for len() check later
     print(f"    Silinecek chunk sayısı: {held_out_count}")
@@ -187,38 +192,36 @@ def test_a(router, gate, llm, sc, system_prompt, verbose) -> Dict:
                          "yer almıyor", "bilgi yok", "not found", "not available",
                          "cannot find", "no information", "kayıt yok"]
     faz2_says_unknown = any(sig in ans2_lower for sig in NOT_FOUND_SIGNALS)
-    faz2_still_answers = ("0x41e00000" in ans2_lower or "41e0" in ans2_lower or "0x40600000" in ans2_lower)
-    faz2_design1_excluded = "design_1" not in " ".join(r2["chunk_files"]).lower()
+    faz2_xdc_excluded = TARGET_STEM not in " ".join(r2["chunk_files"]).lower()
 
-    print(f"    Source chunks : {r2['source_chunks']} (design_1 içeriyor: {not faz2_design1_excluded})")
-    print(f"    Retrieval temiz: {ok('Evet — design_1 hariç') if faz2_design1_excluded else err('Hayır — design_1 hâlâ dönüyor')}")
+    print(f"    Source chunks : {r2['source_chunks']} (100T XDC içeriyor: {not faz2_xdc_excluded})")
+    print(f"    Retrieval temiz: {ok('Evet — 100T XDC hariç') if faz2_xdc_excluded else err('Hayır — 100T XDC hâlâ dönüyor')}")
     print(f"    'Yok' sinyali : {ok('Veriyor') if faz2_says_unknown else warn('Vermiyor (LLM graph/bilgi kullanıyor)')}")
 
     # ── Faz 3: Yeniden ekle, tekrar sor ─────────────────────────────────────
-    print(f"\n  {B}Faz 3{RST}: design_1.tcl yeniden ekleniyor")
-    added = sc.add_file(TARGET_FILE, "nexys_a7_dma_audio",
-                        ["COMP-A-axi_dma_0", "COMP-A-mig_7series_0"])
+    print(f"\n  {B}Faz 3{RST}: Nexys-A7-100T-Master.xdc yeniden ekleniyor")
+    added = sc.add_file(TARGET_FILE, "nexys_a7_100t_dma_audio", [])
     print(f"    Yeniden eklenen chunk: {added}")
 
     r3 = ask(QUESTION_A, router, gate, llm, system_prompt, verbose)
     ans3_lower = r3["answer"].lower()
-    faz3_found_cache = "0x41e00000" in ans3_lower or "41e0" in ans3_lower
-    faz3_found_dma   = "0x40600000" in ans3_lower or "40600000" in ans3_lower or "axi_dma" in ans3_lower
+    faz3_found_pin_pwm = "a11" in ans3_lower or "pwm_audio_0_pwm" in ans3_lower
+    faz3_found_pin_en  = "d12" in ans3_lower or "pwm_audio_0_en" in ans3_lower
 
     print(f"    Source chunks : {r3['source_chunks']}")
-    print(f"    DMA addr      : {ok('Bulundu') if faz3_found_cache else err('Bulunamadı')}")
-    print(f"    UART addr     : {ok('Bulundu') if faz3_found_dma else err('Bulunamadı')}")
+    print(f"    PWM pin (A11) : {ok('Bulundu') if faz3_found_pin_pwm else err('Bulunamadı')}")
+    print(f"    EN  pin (D12) : {ok('Bulundu') if faz3_found_pin_en else err('Bulunamadı')}")
 
     # ── Skor ────────────────────────────────────────────────────────────────
     # Faz1: Doğru cevap → 1.0 puan
-    faz1_score = (faz1_found_cache + faz1_found_dma) / 2
-    # Faz2: Retrieval correctly excludes design_1 (0.7) + LLM says unknown (0.3 bonus)
+    faz1_score = (faz1_found_pin_pwm + faz1_found_pin_en) / 2
+    # Faz2: Retrieval correctly excludes 100T XDC (0.7) + LLM says unknown (0.3 bonus)
     # Note: LLM may still answer from graph/training data even when chunks are deleted —
     # retrieval exclusion is the primary test, "I don't know" is secondary
-    faz2_retrieval_ok = faz2_design1_excluded  # True if design_1 chunks not returned
+    faz2_retrieval_ok = faz2_xdc_excluded  # True if 100T XDC chunks not returned
     faz2_score = faz2_retrieval_ok * 0.7 + faz2_says_unknown * 0.3
     # Faz3: Dosya eklenince tekrar doğru cevap → 1.0 puan
-    faz3_score = (faz3_found_cache + faz3_found_dma) / 2
+    faz3_score = (faz3_found_pin_pwm + faz3_found_pin_en) / 2
 
     total = (faz1_score + faz2_score + faz3_score) / 3
 
@@ -231,10 +234,9 @@ def test_a(router, gate, llm, sc, system_prompt, verbose) -> Dict:
         "faz1_score": faz1_score,
         "faz2_score": faz2_score,
         "faz3_score": faz3_score,
-        "faz1_design1_indexed": faz1_design1_in,
+        "faz1_xdc_indexed": faz1_xdc_in,
         "faz2_says_unknown": faz2_says_unknown,
-        "faz2_still_hallucinated": faz2_still_answers,
-        "faz3_recovered": faz3_found_cache,
+        "faz3_recovered": faz3_found_pin_pwm and faz3_found_pin_en,
         "held_out_chunks": len(held_out_ids),
         "restored_chunks": added,
     }

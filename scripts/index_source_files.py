@@ -37,214 +37,63 @@ load_dotenv(_ROOT / ".env")
 # Her proje için: project_id, kaynak dizinleri, ilgili graph node_id'leri
 # Proje isimleri: nexys_a7_dma_audio, axi_gpio_example
 
-_VT = str(Path.home() / "Desktop/fpga_asist_dev-master/fpga_asist_dev-master/validation_test")
-
-# Tüm projeler için varsayılan uzantı listesi.
-# Yeni uzantı eklendiğinde buraya eklemek yeterli — tüm projeler otomatik kapsanır.
-# .prj: Xilinx MIG XML (DDR3/DDR2 pin + clock config). Chunker format imzasını
-#        kontrol eder; MIG XML değilse sıfır chunk → gürültü yok.
 DEFAULT_INCLUDE_EXTS = [".v", ".sv", ".c", ".h", ".xdc", ".tcl", ".prj"]
 
-PROJECT_SOURCE_CATALOG = [
-    # ── nexys_a7_dma_audio ───────────────────────────────────────────────────
-    {
-        "project": "nexys_a7_dma_audio",
-        "display_name": "Nexys A7 DMA Audio",
-        "roots": [
-            str(_ROOT / "data/code/Nexys-A7-100T-DMA-Audio"),
-        ],
-        "include_exts": DEFAULT_INCLUDE_EXTS + [".json", ".pdf"],
-        "exclude_patterns": [".git", "__pycache__", "node_modules", ".ip_user_files",
-                              "_pycache_", "sim_", ".cache"],
-        "specific_files": [
-            str(Path.home() / "Documents/nexys-a7_rm.pdf"),
-        ],
-        "file_node_map": {
-            "axis2fifo.v": ["COMP-A-axis2fifo_0"],
-            "fifo2audpwm.v": ["COMP-A-fifo2audpwm_0"],
-            "tone_generator.v": ["COMP-A-tone_generator_0"],
-            "design_1.tcl": ["COMP-A-axi_dma_0", "COMP-A-mig_7series_0"],
-            "Nexys-A7-100T-Master.xdc": ["COMP-A-clk_wiz_0"],
-            "helloworld.c": ["COMP-A-helloworld", "COMP-A-axi_dma_0"],
-            "platform.c": [],
-            "platform.h": [],
-        },
-    },
-    # ── axi_gpio_example ─────────────────────────────────────────────────────
-    {
-        "project": "axi_gpio_example",
-        "display_name": "AXI GPIO Example (Nexys Video)",
-        "roots": [
-            f"{_VT}/axi_example",
-        ],
-        "include_exts": DEFAULT_INCLUDE_EXTS + [".json"],
-        "exclude_patterns": [".git", "__pycache__", "vivado_minimal_mb", "RUN_AXI"],
-        "file_node_map": {
-            "nexys_video.xdc": ["COMP-B-clk_wiz_0", "COMP-B-rst_clk_wiz_0_100M"],
-            "Nexys-Video-Master.xdc": ["COMP-B-clk_wiz_0"],
-            "axi_gpio_wrapper.v": ["COMP-B-axi_gpio_wrapper"],
-            "add_axi_gpio.tcl": ["COMP-B-axi_gpio_0", "COMP-B-microblaze_0_axi_periph"],
-            "create_minimal_microblaze.tcl": ["COMP-B-microblaze_0", "COMP-B-clk_wiz_0", "COMP-B-mdm_1"],
-            "create_axi_simple_gpio.tcl": ["COMP-B-axi_gpio_0"],
-            "SYNTHESIS_RESULTS.md": ["COMP-B-microblaze_0", "COMP-B-axi_gpio_0", "COMP-B-clk_wiz_0"],
-        },
-        "specific_files": [
-            f"{_VT}/axi_example/SYNTHESIS_RESULTS.md",
-            str(_ROOT / "data/code/digilent-xdc/Nexys-Video-Master.xdc"),
-        ],
-    },
-    # ── Validation test projects ──────────────────────────────────────────────
-    {
-        "project": "gtx_ddr_example",
-        "display_name": "GTX DDR Example (Nexys Video)",
-        "roots": [
-            f"{_VT}/gtx_ddr_example",
-            str(_ROOT / "data/code/gtx_ddr_example"),
-        ],
-        "include_exts": DEFAULT_INCLUDE_EXTS + [".md"],
-        "exclude_patterns": [
-            ".git", "__pycache__", ".cache", ".gen", ".runs",
-            ".hw", ".ip_user_files", "vivado_zynq_gtx",
-            "backup", ".dmp",
-        ],
-        "specific_files": [
-            str(_ROOT / "data/code/gtx_ddr_example/vivado_zynq_gtx/zynq_gtx_ddr_project.srcs/constrs_1/new/zynq_pins.xdc"),
-        ],
-        "file_node_map": {},
-    },
-    # ── hdmi_video_example ────────────────────────────────────────────────────
-    {
-        "project": "hdmi_video_example",
-        "display_name": "HDMI Video Example (Nexys Video)",
-        "roots": [
-            str(_ROOT / "data/code/hdmi_video_example"),
-        ],
-        "include_exts": DEFAULT_INCLUDE_EXTS + [".md"],
-        "exclude_patterns": [
-            ".git", "__pycache__", ".cache", ".gen", ".runs",
-            ".hw", ".ip_user_files", "digilent_project", "vivado_zynq_video",
-            "xgui",
-        ],
-        "specific_files": [
-            # Digilent vivado-library IP XDC kısıtlamaları
-            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/src/axi_dynclk.xdc"),
-            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/dvi2rgb/src/dvi2rgb.xdc"),
-            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/rgb2dvi/src/rgb2dvi.xdc"),
-            # axi_dynclk RTL ve driver
-            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/src/mmcme2_drp.v"),
-            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/drivers/dynclk/src/ddynclk.c"),
-            str(_ROOT / "data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/drivers/dynclk/src/ddynclk.h"),
-            # Proje XDC kısıtlamaları
-            str(_ROOT / "data/code/hdmi_video_example/vivado_zynq_video/zynq_video_project.srcs/constrs_1/new/video_pins.xdc"),
-        ],
-        "file_node_map": {},
-    },
-    {
-        "project": "i2c_example",
-        "display_name": "I2C Example (Nexys Video)",
-        "roots": [f"{_VT}/i2c_example"],
-        "include_exts": DEFAULT_INCLUDE_EXTS,
-        "exclude_patterns": [".git", "__pycache__", ".cache"],
-        "file_node_map": {},
-    },
-    {
-        "project": "pcie_dma_ddr_example",
-        "display_name": "PCIe DMA DDR Example",
-        "roots": [f"{_VT}/pcie_dma_ddr_example"],
-        "include_exts": DEFAULT_INCLUDE_EXTS,
-        "exclude_patterns": [".git", "__pycache__", ".cache"],
-        "file_node_map": {},
-    },
-    {
-        "project": "pcie_xdma_mb_example",
-        "display_name": "PCIe XDMA MicroBlaze Example",
-        "roots": [f"{_VT}/pcie_xdma_mb_example"],
-        "include_exts": DEFAULT_INCLUDE_EXTS,
-        "exclude_patterns": [".git", "__pycache__", ".cache"],
-        "file_node_map": {},
-    },
-    {
-        "project": "rgmii_example",
-        "display_name": "RGMII Ethernet Example (Nexys Video)",
-        "roots": [f"{_VT}/rgmii_example"],
-        "include_exts": DEFAULT_INCLUDE_EXTS,
-        "exclude_patterns": [".git", "__pycache__", ".cache"],
-        "file_node_map": {},
-    },
-    {
-        "project": "v2_mig",
-        "display_name": "MIG DDR3 v2 Example",
-        "roots": [f"{_VT}/v2_mig"],
-        "include_exts": DEFAULT_INCLUDE_EXTS,
-        "exclude_patterns": [".git", "__pycache__", ".cache"],
-        "file_node_map": {},
-    },
-    {
-        "project": "v3_gtx",
-        "display_name": "GTX Transceiver v3 Example",
-        "roots": [f"{_VT}/v3_gtx"],
-        "include_exts": DEFAULT_INCLUDE_EXTS,
-        "exclude_patterns": [".git", "__pycache__", ".cache"],
-        "file_node_map": {},
-    },
-    {
-        "project": "spi_example",
-        "display_name": "SPI Pmod Example (Nexys Video)",
-        "roots": [f"{_VT}/spi_example"],
-        "include_exts": DEFAULT_INCLUDE_EXTS,
-        "exclude_patterns": [".git", "__pycache__", ".cache"],
-        "file_node_map": {},
-    },
-    {
-        "project": "uart_example",
-        "display_name": "UART Example",
-        "roots": [f"{_VT}/uart_example"],
-        "include_exts": DEFAULT_INCLUDE_EXTS,
-        "exclude_patterns": [".git", "__pycache__", ".cache"],
-        "file_node_map": {},
-    },
-    # ── Zybo-Z7-20-pcam-5c ───────────────────────────────────────────────────
-    {
-        "project": "zybo_z7_20_pcam_5c",
-        "display_name": "Zybo Z7-20 Pcam 5C (MIPI CSI-2 Camera + HDMI)",
-        "roots": [
-            f"{_VT}/Zybo-Z7-20-pcam-5c/src",
-            f"{_VT}/Zybo-Z7-20-pcam-5c/sdk/appsrc/pcam_vdma_hdmi",
-        ],
-        "include_exts": DEFAULT_INCLUDE_EXTS + [".vhd", ".cc", ".md"],
-        "exclude_patterns": [
-            ".git", "__pycache__", ".cache", ".gen", ".runs",
-            ".hw", ".ip_user_files", "ipshared", "platform",
-            "*stub*", "*sim_netlist*",
-        ],
-        "specific_files": [],
-        "file_node_map": {
-            "system.tcl": ["zybo_z7_20_pcam_5c"],
-            "ZyboZ7_A.xdc": ["zybo_z7_20_pcam_5c"],
-            "main.cc": ["zybo_z7_20_pcam_5c"],
-            "DVIClocking.vhd": ["zybo_z7_20_pcam_5c"],
-            "timing.xdc": ["zybo_z7_20_pcam_5c"],
-        },
-    },
-    # ── Arty-S7-25-base-rt ───────────────────────────────────────────────────
-    {
-        "project": "arty_s7_25_base_rt",
-        "display_name": "Arty S7-25 Base System (Real-time Processing)",
-        "roots": [
-            f"{_VT}/Arty-S7-25-base-rt/proj",
-            f"{_VT}/Arty-S7-25-base-rt/sdk",
-            f"{_VT}/Arty-S7-25-base-rt/src/bd/system/hw_handoff",
-            f"{_VT}/Arty-S7-25-base-rt/src/bd/system/hdl",
-        ],
-        "include_exts": DEFAULT_INCLUDE_EXTS + [".vhd"],
-        "exclude_patterns": [".git", "__pycache__", ".cache"],
-        "specific_files": [
-            f"{_VT}/Arty-S7-25-base-rt/src/constraints/Arty-S7-25-Master.xdc",
-            f"{_VT}/Arty-S7-25-base-rt/src/bd/system/ip/system_mig_7series_0_0/system_mig_7series_0_0/mig.prj",
-        ],
-        "file_node_map": {},
-    },
-]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# YAML loader — projects.yaml tek kaynak (config-as-data)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _load_catalog_from_yaml() -> List[Dict]:
+    """
+    projects.yaml'dan PROJECT_SOURCE_CATALOG'ı yükle.
+
+    YAML formatı: projects.yaml (proje kökünde)
+    Path değişkenleri: {root} → GC-RAG-VIVADO-2/, {vt} → validation_test/
+    """
+    import yaml
+
+    yaml_path = _ROOT / "projects.yaml"
+    if not yaml_path.exists():
+        raise FileNotFoundError(
+            f"projects.yaml bulunamadı: {yaml_path}\n"
+            "Yeni proje eklemek için projects.yaml düzenleyin."
+        )
+
+    with open(yaml_path, "r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+
+    variables = raw.get("variables", {})
+    vt = str(Path(variables.get("vt", "")).expanduser())
+
+    defaults = raw.get("defaults", {})
+    default_include_exts = defaults.get("include_exts", DEFAULT_INCLUDE_EXTS)
+    default_exclude_patterns = defaults.get("exclude_patterns", [".git", "__pycache__", ".cache"])
+
+    def expand(s: str) -> str:
+        s = s.replace("{root}", str(_ROOT))
+        s = s.replace("{vt}", vt)
+        return str(Path(s).expanduser())
+
+    catalog = []
+    for proj_id, cfg in raw.get("projects", {}).items():
+        catalog.append({
+            "project": proj_id,
+            "display_name": cfg.get("display_name", proj_id),
+            "roots": [expand(r) for r in cfg.get("roots", [])],
+            "include_exts": cfg.get("include_exts", default_include_exts),
+            "exclude_patterns": cfg.get("exclude_patterns", default_exclude_patterns),
+            "specific_files": [expand(s) for s in cfg.get("specific_files", [])],
+            "file_node_map": cfg.get("file_node_map", {}),
+        })
+
+    return catalog
+
+
+# Proje kataloğu — projects.yaml'dan yüklenir.
+# Yeni proje eklemek için projects.yaml'ı düzenle, bu dosyaya dokunma.
+PROJECT_SOURCE_CATALOG = _load_catalog_from_yaml()
+
 
 # Proje dokümanları (data/docs/)
 # NOT: Bu dosyalar SourceChunkStore'a dahil edilmiyor.
@@ -252,6 +101,40 @@ PROJECT_SOURCE_CATALOG = [
 # Türkçe sorguları yanlış eşleştiriyor ve proje kaynak chunk'larını gürültüyle bozuyor.
 # Bu dosyalar zaten ana eğitim ChromaDB'sinde (chroma_graph_nodes) bulunuyor.
 DOC_SOURCES: list = []  # Boş — docs intentionally excluded from source chunk store
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Kritik dosya pattern'leri — exclude_patterns'dan bağımsız aranır
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Bu dosyalar normal discover_files() tarafından atlanabilir (örn. .gen, .hw,
+# .ip_user_files dizinleri hariç tutulur) ancak kritik konfigürasyon verisi içerirler.
+# Pattern bazlı — spesifik proje veya soru bağımsız, tüm projeler için geçerlidir.
+_CRITICAL_FILE_PATTERNS = [
+    "mig.prj",      # MIG 7 Series DDR2/DDR3 pin + timing konfigürasyonu
+    "*.mmi",        # Memory Map Information (address decoder bilgisi)
+]
+
+
+def discover_critical_files(roots: List[str], already_found: set) -> List[Path]:
+    """
+    Kritik konfigürasyon dosyalarını exclude_patterns'dan bağımsız olarak bul.
+
+    Normal discover_files() .gen / .hw / .ip_user_files gibi dizinleri hariç tutar
+    ancak mig.prj, *.mmi gibi kritik dosyalar bu dizinlerde de bulunabilir.
+    Bu fonksiyon _CRITICAL_FILE_PATTERNS'a uyan tüm dosyaları bulur ve
+    zaten keşfedilmemiş olanları döndürür.
+    """
+    found = []
+    for root in roots:
+        root_path = Path(root)
+        if not root_path.exists():
+            continue
+        for pattern in _CRITICAL_FILE_PATTERNS:
+            for p in root_path.rglob(pattern):
+                if p.is_file() and str(p) not in already_found:
+                    found.append(p)
+    return found
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -358,6 +241,23 @@ def run_indexing(reset: bool = False, dry_run: bool = False, verbose: bool = Fal
 
                 proj_files += 1
                 total_files += 1
+
+        # ── Kritik dosyalar — exclude_patterns'dan bağımsız otomatik keşif ─────
+        already_found = {str(f) for root in proj_cfg["roots"] for f in
+                         discover_files(root, proj_cfg["include_exts"],
+                                        proj_cfg["exclude_patterns"])}
+        already_found.update(proj_cfg.get("specific_files", []))
+        for crit_path in discover_critical_files(proj_cfg["roots"], already_found):
+            node_ids = get_node_ids_for_file(crit_path.name, proj_cfg["file_node_map"])
+            if verbose or dry_run:
+                print(f"      {crit_path.name:40s} → nodes: {node_ids or ['—']} [critical-auto]")
+            if not dry_run:
+                n = store.add_file(str(crit_path), project, node_ids)
+                proj_chunks += n
+                if verbose:
+                    print(f"         → {n} chunk eklendi")
+            proj_files += 1
+            total_files += 1
 
         # ── Specific files (extension filter'ı bypass eder) ──────────────────
         for specific_path in proj_cfg.get("specific_files", []):

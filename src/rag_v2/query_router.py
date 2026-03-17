@@ -44,6 +44,65 @@ try:
 except ImportError:
     _HAS_DOC_STORE = False
 
+# ─────────────────────────────────────────────────────────────────────────────
+# IP → Xilinx Döküman eşleme tablosu
+# HOW sorgularında yapısal retrieval için: semantic benzerlik kör noktasını kapatır.
+# Proje COMPONENT node'larındaki IP isimleri bu tablo üzerinden doc_id'ye çevrilir.
+# Yeni IP eklendiğinde buraya satır ekle — başka hiçbir şey değişmez.
+# ─────────────────────────────────────────────────────────────────────────────
+_IP_TO_DOCS: Dict[str, List[str]] = {
+    # Saat & Reset
+    "clk_wiz":               ["pg065", "ug572"],
+    "proc_sys_reset":        ["pg164"],
+    # MicroBlaze
+    "microblaze":            ["ug984", "ug898"],
+    "microblaze_mcs":        ["pg048", "ug984"],
+    "mdm":                   ["pg115", "pg062"],
+    "lmb_bram_if_cntlr":     ["ug984"],
+    "lmb_v10":               ["ug984"],
+    # AXI Interconnect
+    "axi_interconnect":      ["pg059"],
+    "smartconnect":          ["pg247"],
+    "axi_register_slice":    ["pg373"],
+    # AXI Periferaller
+    "axi_gpio":              ["pg144"],
+    "axi_uartlite":          ["pg142"],
+    "axi_iic":               ["pg090"],
+    "axi_spi":               ["pg153"],
+    "axi_timer":             ["pg079"],
+    "axi_intc":              ["pg099"],
+    "axi_bram_ctrl":         ["pg078"],
+    # AXI DMA & Streaming
+    "axi_dma":               ["pg021"],
+    "axi_vdma":              ["pg020"],
+    "axis_subset_converter": ["pg085"],
+    "axis_data_fifo":        ["pg085"],
+    # Bellek
+    "mig_7series":           ["ug586"],
+    "blk_mem_gen":           ["pg058"],
+    "fifo_generator":        ["pg057"],
+    # PCIe
+    "axi_pcie":              ["pg054"],
+    "xdma":                  ["pg195"],
+    # GTX / Aurora / Ethernet
+    "aurora_8b10b":          ["pg046"],
+    "aurora_64b66b":         ["pg074"],
+    "gig_ethernet_pcs_pma":  ["pg047"],
+    "tri_mode_ethernet_mac": ["pg051"],
+    # Video
+    "v_tc":                  ["pg016"],
+    "v_axi4s_vid_out":       ["pg044"],
+    "v_vid_in_axi4s":        ["pg043"],
+    "rgb2dvi":               ["pg160"],
+    "dvi2rgb":               ["pg163"],
+    # Debug
+    "xadc_wiz":              ["pg091", "ug480"],
+    "ila":                   ["pg172"],
+    "vio":                   ["pg159"],
+    # Zynq PS
+    "processing_system7":    ["ug585", "pg082", "ug898"],
+}
+
 
 # ---------------------------------------------------------------------------
 # Query Type
@@ -121,6 +180,14 @@ class QueryResult:
 
 # Pattern: (regex, QueryType) — first match wins
 _CLASSIFY_PATTERNS = [
+    # HOW-Workflow (prosedür adımları) — TRACE'den ÖNCE değerlendirilmeli
+    # "hangi adımları izlemeliyim", "hangi sırayı takip et", "adım adım" → daima HOW
+    # Kural: adım/sıra/workflow/aşama vocabulary'si = prosedürel sorgu = HOW
+    # Sinyal izleme (zincir, bileşen) ile karışmaması için önce yakalanır.
+    (r'\b(adım\s+adım|adımlar\w*|hangi\s+adım\w*|hangi\s+sıra\w*|sırasıyla'
+     r'|workflow\w*|prosedür\w*|aşamalar\w*|aşamaları\w*'
+     r'|oluşturma\s+süreç\w*|kurulum\s+süreç\w*'
+     r'|step.by.step|which\s+steps?|what\s+steps?)\b', QueryType.HOW),
     # Trace — traceability / izleme
     # Turkish morphology: izle→izleyin, zincir→zincirini, karşıl→karşıladığını
     # Use \w+ suffix to handle Turkish agglutinative suffixes
@@ -209,12 +276,28 @@ class QueryRouter:
         # 100+ proje eklendiğinde, daha geniş candidate pool gerekir.
         # Nihai LLM context max_nodes=10 + max_chars=8000 ile sınırlıdır,
         # bu yüzden büyük K sadece retrieval kalitesini artırır, token maliyeti sabit.
+        all_nodes = graph_store.get_all_nodes()
         project_count = max(1, sum(
-            1 for n in graph_store.get_all_nodes()
+            1 for n in all_nodes
             if n.get("node_type") == "PROJECT"
         ))
         self.n_vector = n_vector_results if n_vector_results > 0 else max(5, min(project_count + 4, 20))
         self.n_source = n_source_results if n_source_results > 0 else max(6, min(project_count + 2, 24))
+
+        # ── Exact-match proje ID listesi ─────────────────────────────────────
+        # Runtime'da graph PROJECT node'larından türetilir.
+        # _exact_project_match() ve classify() için init'te bir kez hesaplanır.
+        self._project_ids: List[str] = [
+            n["node_id"] for n in all_nodes
+            if n.get("node_type") == "PROJECT" and n.get("node_id")
+        ]
+
+        # ── Paylaşılan board adları — routing sinyali olamaz ──────────────────
+        # Yapısal kural: aynı board'u kullanan 2+ proje varsa, board adı discriminator değil.
+        # "Nexys Video" → 8+ proje: routing için kullanılamaz.
+        # "Zybo Z7-20 Pcam" → 1 proje: kullanılabilir.
+        # Bu set init'te bir kez hesaplanır; yeni proje eklenince otomatik güncellenir.
+        self._shared_board_names: frozenset = self._build_shared_board_names()
 
         # ── Dinamik proje sinyal tablosu ──────────────────────────────────────
         # Sınıf değişkeni _TEXT_PROJECT_SIGNALS statik (hardcoded) girişler içerir.
@@ -223,18 +306,47 @@ class QueryRouter:
         # index_source_files.py'ye veya query_router.py'ye dokunmak gerekmez.
         self._TEXT_PROJECT_SIGNALS = self._build_dynamic_signals()
 
+    # CrossRef dominance threshold: tek proje bu oranın üstündeyse CrossRef tetiklenmez.
+    # Kısa/genel keyword'ler (gpio, dma, uart) az ağırlık alır → spesifik proje ID'si baskın çıkar.
+    # Sistem bazlı: retrieval sinyal gücüne dayalı, soru parsing'ine değil.
+    _CROSSREF_DOMINANCE = 0.70
+
     def classify(self, question: str) -> QueryType:
         qt = classify_query(question)
-        # If two DIFFERENT projects are mentioned by text signals, force CROSSREF
-        # regardless of other pattern matches (e.g., D-CROSS-1 style questions)
-        if qt != QueryType.CROSSREF:
-            q_lower = question.lower()
-            projects_seen: set = set()
+        q_lower = question.lower()
+
+        # ── Exact project ID match: soruda kaç farklı project_id geçiyor? ──────
+        # count == 1 → tek proje sorusu: CrossRef yanlış tetiklendiyse baskıla.
+        # count >= 2 → gerçek karşılaştırma: CrossRef doğru kalır.
+        # Sistem bazlı: project_ids graph'tan türetilir, hardcoded keyword yok.
+        # Not: _exact_project_match() longest-match döndürür (tek proje).
+        # classify() için TÜM eşleşmeleri saymamız gerekiyor — ayrı döngü.
+        exact_matches: set = set()
+        for pid in self._project_ids:
+            pid_lower = pid.lower()
+            if (pid_lower in q_lower
+                    or pid_lower.replace("_", " ") in q_lower
+                    or pid_lower.replace("_", "-") in q_lower):
+                exact_matches.add(pid)
+
+        if len(exact_matches) == 1 and qt == QueryType.CROSSREF:
+            # Tek proje → CrossRef false positive → WHAT'a düşür
+            qt = QueryType.WHAT
+
+        # ── Metin sinyal bazlı CrossRef (exact match yoksa) ──────────────────
+        # İki proje keyword'ü aynı soruda ama biri baskın değilse CrossRef zorla.
+        # exact_matches varsa bu blok atlanır — exact match daha güvenilir sinyal.
+        if qt != QueryType.CROSSREF and not exact_matches:
+            project_weight: Dict[str, int] = {}
             for keyword, project in self._TEXT_PROJECT_SIGNALS:
                 if keyword in q_lower:
-                    projects_seen.add(project)
-            if len(projects_seen) >= 2:
-                qt = QueryType.CROSSREF
+                    project_weight[project] = project_weight.get(project, 0) + len(keyword)
+            if len(project_weight) >= 2:
+                total = sum(project_weight.values())
+                top   = max(project_weight.values())
+                if top / total < self._CROSSREF_DOMINANCE:
+                    qt = QueryType.CROSSREF
+
         return qt
 
     # Doc sorgu keyword'leri — proje sinyali olmasa bile doc_store'a bak
@@ -252,16 +364,96 @@ class QueryRouter:
         re.IGNORECASE,
     )
 
-    def _search_doc_store(self, question: str) -> List[Dict]:
+    def _exact_project_match(self, question: str) -> Optional[str]:
+        """
+        Soruda herhangi bir project_id'nin tam veya boşluklu formu geçiyorsa döndür.
+        En uzun eşleşme kazanır — benzer isimli projelerde doğru proje seçilir.
+        (Örnek: "arty_s7_25_base_rt" hem "arty s7" hem "arty_s7_25_base_rt" formuna uyar
+         → uzun olanı kazanır, kısa "arty s7" başka projeye çekmez.)
+
+        Sistem bazlı: project_ids graph'tan __init__'te derlenir, hardcoded kelime yok.
+        Yeni proje eklendikçe otomatik kapsar.
+        """
+        q = question.lower()
+        best: Optional[str] = None
+        best_len: int = 0
+        for pid in self._project_ids:
+            pid_lower = pid.lower()
+            # Üç form: altçizgili (fpga_vbs), boşluklu (fpga vbs), tireli (fpga-vbs)
+            for form in (pid_lower,
+                         pid_lower.replace("_", " "),
+                         pid_lower.replace("_", "-")):
+                # min 4 karakter — kısa kısaltmalar (e.g. "i2c") genel kelime olabilir
+                if len(form) >= 4 and form in q and len(form) > best_len:
+                    best = pid
+                    best_len = len(form)
+        return best
+
+    def _search_doc_store(self, question: str, n_results: int = 0) -> List[Dict]:
         """
         DocStore araması — genel Vivado/Vitis soruları için.
         HOW/WHAT/ENUMERATE tiplerinde ve doc keyword'leri varsa çalışır.
         Proje-spesifik context'i bozmamak için az sayıda (n_doc) sonuç döner.
+        n_results > 0 ise self.n_doc'u override eder (kavramsal sorgular için boost).
         """
         if not self.doc_store:
             return []
+        n = n_results if n_results > 0 else self.n_doc
         try:
-            return self.doc_store.search(question, n_results=self.n_doc)
+            return self.doc_store.search(question, n_results=n)
+        except Exception:
+            return []
+
+    def _get_ip_doc_chunks(
+        self, project: Optional[str], question: str
+    ) -> List[Dict]:
+        """
+        HOW + proje sinyali durumunda yapısal IP→Doc retrieval.
+        Graph COMPONENT node'ları yerine source chunk store'daki TCL içeriğinden
+        query-time parse ile IP isimlerini çıkarır → _IP_TO_DOCS → DocStore.
+
+        Soru-bağımsız: her proje için TCL chunk'ları zaten indeksli.
+        IP-bağımsız: _IP_TO_DOCS'a yeni satır eklemek yeterli.
+        """
+        if not self.doc_store or not project or not self.source_store:
+            return []
+
+        # 1. Projenin TCL chunk'larını çek → create_bd_cell -vlnv regex ile IP isimlerini çıkar
+        ip_names: set = set()
+        try:
+            col = self.source_store._get_collection()
+            data = col.get(
+                where={"$and": [{"project": {"$eq": project}}, {"file_type": {"$eq": "tcl"}}]},
+                include=["documents"],
+            )
+            _VLNV_RE = re.compile(
+                r'create_bd_cell\s+-type\s+ip\s+.*?-vlnv\s+\S+:(\w+):\S+',
+                re.IGNORECASE,
+            )
+            for doc in data.get("documents", []):
+                for m in _VLNV_RE.finditer(doc or ""):
+                    ip_names.add(m.group(1).lower())
+        except Exception:
+            return []
+
+        if not ip_names:
+            return []
+
+        # 2. _IP_TO_DOCS üzerinden benzersiz doc_id listesi oluştur
+        doc_ids: List[str] = []
+        seen_doc_ids: set = set()
+        for ip in sorted(ip_names):
+            for doc_id in _IP_TO_DOCS.get(ip, []):
+                if doc_id not in seen_doc_ids:
+                    doc_ids.append(doc_id)
+                    seen_doc_ids.add(doc_id)
+
+        if not doc_ids:
+            return []
+
+        # 3. DocStore'da filtrelenmiş semantic arama
+        try:
+            return self.doc_store.search_in_docs(question, doc_ids, n_per_doc=2)
         except Exception:
             return []
 
@@ -271,6 +463,28 @@ class QueryRouter:
         """
         if query_type is None:
             query_type = self.classify(question)
+
+        # ── Genel Sorgu Yolu ────────────────────────────────────────────────────
+        # Tetikleyici: proje sinyali yokluğu (yapısal) + proje bağlamı gerektiren route.
+        #
+        # TRACE ve CROSSREF proje bağlamı varsayar: graph traversal, cross-project edge.
+        # Proje sinyali olmadan bu route'lara girmek graph gürültüsüne yol açar —
+        # LLM ilgisiz REQUIREMENT/COMPONENT node'larını bağlam olarak kullanır.
+        #
+        # Çözüm: proje sinyali yok + TRACE/CROSSREF → WHAT'a override.
+        # WHAT route tüm store'ları paralel sorgular, DocStore öne çıkar.
+        # Sonsuz soru uzayı prensibi: keyword değil, yapısal özellik (sinyal yokluğu).
+        _has_project_signal = (
+            self._exact_project_match(question) is not None
+            or any(kw in question.lower() for kw, _ in self._TEXT_PROJECT_SIGNALS)
+        )
+        _is_general_query = (
+            not _has_project_signal
+            and query_type in (QueryType.TRACE, QueryType.CROSSREF)
+            and not self._ALL_PROJECTS_RE.search(question.lower())
+        )
+        if _is_general_query:
+            query_type = QueryType.WHAT
 
         if query_type == QueryType.WHAT:
             result = self._route_what(question)
@@ -287,11 +501,55 @@ class QueryRouter:
         else:
             result = self._route_what(question)
 
-        # 5. store: DocStore — HOW/WHAT/ENUMERATE + doc keyword'leri içeriyorsa
-        # WHY/TRACE/CROSSREF için doc context genellikle gereksiz
-        if query_type in (QueryType.WHAT, QueryType.HOW, QueryType.ENUMERATE) \
-                or self._DOC_QUERY_RE.search(question):
-            result.doc_chunks = self._search_doc_store(question)
+        # ── DocStore boost ──────────────────────────────────────────────────────
+        # Katmanlar (proje sinyali varlığına göre, yapısal karar):
+        #
+        # 1. _is_general_query (TRACE/CROSSREF, proje sinyali yok):
+        #    DocStore birincil → 3x boost, source_chunks[:2] (graph gürültüsü kesilir).
+        #
+        # 2. HOW, proje sinyali yok:
+        #    DocStore 3x boost, source_chunks KORUNUR (TCL örnekleri değerli).
+        #    Route tipi değişmez — HOW meta chunk'ları hâlâ aranır.
+        #
+        # 3. WHAT/WHY, proje sinyali yok (kavramsal):
+        #    DocStore 2x boost.
+        #
+        # 4. Proje sinyali var (proje-spesifik): n_doc sabit (gürültü önlenir).
+        #
+        # Sistem bazlı: proje sinyali varlığı sorgudan değil, sinyal tablosundan kontrol edilir.
+        # Yeni proje/doküman eklendiğinde otomatik çalışır — keyword gerekmez.
+        _is_general_how = (
+            not _has_project_signal
+            and result.query_type == QueryType.HOW
+        )
+        if _is_general_query:
+            n_doc_eff = max(self.n_doc * 3, 12)
+            result.doc_chunks = self._search_doc_store(question, n_results=n_doc_eff)
+            result.source_chunks = result.source_chunks[:2]
+        elif _is_general_how:
+            n_doc_eff = max(self.n_doc * 3, 12)
+            result.doc_chunks = self._search_doc_store(question, n_results=n_doc_eff)
+            # source_chunks korunur — gerçek proje TCL/HDL örnekleri referans değeri taşır
+        else:
+            is_conceptual = (
+                result.query_type in (QueryType.WHAT, QueryType.WHY)
+                and not _has_project_signal
+            )
+            n_doc_eff = max(self.n_doc * 2, 8) if is_conceptual else self.n_doc
+            result.doc_chunks = self._search_doc_store(question, n_results=n_doc_eff)
+
+            # ── HOW + proje sinyali: yapısal IP→Doc retrieval ────────────────────
+            # Semantik arama "nasıl sentezlerim" → "apply_bd_automation" bağlantısını
+            # kuramaz. Graph'taki COMPONENT node'larından IP listesi çıkarılıp
+            # _IP_TO_DOCS üzerinden ilgili PG/UG chunk'ları doğrudan çekilir.
+            # Soru-bağımsız, IP-bağımsız — yeni proje/IP eklenince otomatik çalışır.
+            if result.query_type == QueryType.HOW and _has_project_signal:
+                project_for_ip = self._resolve_project(question, result.vector_hits)
+                ip_chunks = self._get_ip_doc_chunks(project_for_ip, question)
+                existing_doc_ids = {c.get("chunk_id") for c in result.doc_chunks}
+                for c in ip_chunks:
+                    if c.get("chunk_id") not in existing_doc_ids:
+                        result.doc_chunks.append(c)
 
         return result
 
@@ -416,10 +674,6 @@ class QueryRouter:
                     if nid and nid not in existing_ids and nid not in self._stale_ids:
                         graph_nodes.insert(0, {"node_id": nid, **node})
                         existing_ids.add(nid)
-            # Skip req_tree expansion — project listing should not flood REQUIREMENT nodes
-            req_tree = []
-        else:
-            req_tree = self._get_req_trees_for_nodes(graph_nodes)
 
         # ── Edge traversal for WHAT queries ──────────────────────────────
         # Enrich context with structural edges so LLM can reason multi-hop.
@@ -455,7 +709,26 @@ class QueryRouter:
 
         project = self._resolve_project(question, vector_hits)
         graph_nodes = self._filter_cross_project_nodes(graph_nodes, project)
-        source_chunks = self._search_source_chunks(question, project_filter=project)
+
+        # req_tree: filter'dan SONRA hesaplanmalı — aksi hâlde filtrelenmemiş
+        # REQUIREMENT node'ları req_tree'ye sızar (özellikle proje tespitsiz genel sorgularda).
+        if is_project_listing:
+            # Skip req_tree expansion — project listing should not flood REQUIREMENT nodes
+            req_tree = []
+        else:
+            req_tree = self._get_req_trees_for_nodes(graph_nodes)
+
+        # Kavramsal sorular: sinyal tablosu kontrolü _search_source_chunks'tan ÖNCE.
+        # Tier 2b semantik arama genel sorular için yanlış proje döndürebilir (0.45 eşik).
+        # has_project_signal=False ise Tier 2b'nin proje filtresini yok say → global top-4.
+        has_project_signal = (
+            self._exact_project_match(question) is not None
+            or any(kw in question.lower() for kw, _ in self._TEXT_PROJECT_SIGNALS)
+        )
+        effective_project = project if (has_project_signal or is_project_listing) else None
+        source_chunks = self._search_source_chunks(question, project_filter=effective_project)
+        if not has_project_signal and not is_project_listing:
+            source_chunks = source_chunks[:4]
 
         return QueryResult(
             query=question,
@@ -496,7 +769,19 @@ class QueryRouter:
 
         project = self._resolve_project(question, vector_hits)
         graph_nodes = self._filter_cross_project_nodes(graph_nodes, project)
-        source_chunks = self._search_source_chunks(question, project_filter=project)
+
+        # Meta chunks: HOW route → her zaman prepend, soru regex'ine bağımlılık yok.
+        # Routing zaten HOW olarak sınıflandırdı — classifier ne kadar iyileşirse
+        # meta boost da otomatik iyileşir. Yeni proje eklendiğinde de çalışır.
+        seen_ids: set = set()
+        source_chunks: List[Dict[str, Any]] = []
+        if self.source_store and project:
+            for mc in self.source_store.get_meta_chunks(project):
+                seen_ids.add(mc["chunk_id"])
+                source_chunks.append(mc)
+        for c in self._search_source_chunks(question, project_filter=project):
+            if c["chunk_id"] not in seen_ids:
+                source_chunks.append(c)
 
         return QueryResult(
             query=question,
@@ -544,7 +829,17 @@ class QueryRouter:
 
         project = self._resolve_project(question, vector_hits)
         graph_nodes = self._filter_cross_project_nodes(graph_nodes, project)
-        source_chunks = self._search_source_chunks(question, project_filter=project)
+
+        # Kavramsal WHY: sinyal tablosu kontrolü _search_source_chunks'tan ÖNCE.
+        # Tier 2b false positive'in proje filtresini kavramsal sorularda yok say.
+        has_project_signal = (
+            self._exact_project_match(question) is not None
+            or any(kw in question.lower() for kw, _ in self._TEXT_PROJECT_SIGNALS)
+        )
+        effective_project = project if has_project_signal else None
+        source_chunks = self._search_source_chunks(question, project_filter=effective_project)
+        if not has_project_signal:
+            source_chunks = source_chunks[:4]
 
         return QueryResult(
             query=question,
@@ -618,11 +913,10 @@ class QueryRouter:
                     if n:
                         visited_nodes[nbr_id] = {"node_id": nbr_id, **n}
 
-        # Req tree for any requirements in scope
-        req_tree = self._get_req_trees_for_nodes(list(visited_nodes.values()))
-
         project = self._resolve_project(question, vector_hits)
         trace_nodes = self._filter_cross_project_nodes(list(visited_nodes.values()), project)
+        # req_tree: filter'dan SONRA — filtrelenmiş node'lar üzerinden genişlet
+        req_tree = self._get_req_trees_for_nodes(trace_nodes)
         source_chunks = self._search_source_chunks(question, project_filter=project)
 
         return QueryResult(
@@ -725,140 +1019,111 @@ class QueryRouter:
     # Source chunk helper — 4th store
     # ------------------------------------------------------------------
 
-    # Question-text keywords → specific project name (real dir name)
-    # None döndüren sorular global arama yapar (filtre yok)
+    # Statik proje sinyalleri — YALNIZCA FTS5 auto-signals'da bulunmayan
+    # doğal dil / Türkçe / teknoloji terimler.
+    #
+    # FTS5 index zamanında otomatik çıkarılanlar (chunk_label, dosya adı, TCL IP):
+    #   axis2fifo, fifo2audpwm, tone_generator, create_gtx_ddr_mb, create_i2c_with_xdc,
+    #   aurora_8b10b gibi spesifik terimler _build_dynamic_signals()'de FTS5'ten okunur.
+    #
+    # Bu listede sadece kaynak kodda GEÇMEYEN ama sohbette kullanılan terimler kalır.
     _TEXT_PROJECT_SIGNALS: List[tuple] = [
-        # nexys_a7_dma_audio
-        ("nexys a7", "nexys_a7_dma_audio"),
-        ("nexys-a7", "nexys_a7_dma_audio"),
-        ("nexys_a7", "nexys_a7_dma_audio"),
-        ("nexys_a7_dma_audio", "nexys_a7_dma_audio"),
-        ("dma audio", "nexys_a7_dma_audio"),
+        # Doğal dil / Türkçe (kaynak kodda yok)
         ("dma ses", "nexys_a7_dma_audio"),
-        ("axis2fifo", "nexys_a7_dma_audio"),
-        ("fifo2audpwm", "nexys_a7_dma_audio"),
-        ("tone_generator", "nexys_a7_dma_audio"),
-        ("helloworld", "nexys_a7_dma_audio"),
+        ("dma audio", "nexys_a7_dma_audio"),
         ("pwm audio", "nexys_a7_dma_audio"),
-        ("aud_pwm", "nexys_a7_dma_audio"),
-        ("s2mm", "nexys_a7_dma_audio"),
+        ("s2mm", "nexys_a7_dma_audio"),           # DMA yönü, kod içinde yok label'da
         ("mm2s", "nexys_a7_dma_audio"),
-        ("ddr2", "nexys_a7_dma_audio"),
-        ("mig_7series", "nexys_a7_dma_audio"),
-        ("mt47h", "nexys_a7_dma_audio"),
-        # axi_gpio_example — NOT: "nexys video gtx/hdmi" daha spesifik, önce gelir
-        ("nexys video gtx", "gtx_ddr_example"),
+        ("ddr2", "nexys_a7_dma_audio"),            # DDR çip modeli referansı
+        ("mt47h", "nexys_a7_dma_audio"),           # DDR çip model numarası başlangıcı
+        # Nexys Video board → FTS5 board adından gelmiyor (alt-proje belirsizliği)
+        ("nexys video gtx", "gtx_ddr_example"),    # Spesifik alt-proje tanımlayıcı
         ("nexys video hdmi", "hdmi_video_example"),
-        ("nexys video", "axi_gpio_example"),
-        ("axi_gpio_example", "axi_gpio_example"),
-        ("gpio_example", "axi_gpio_example"),
-        ("axi_gpio_wrapper", "axi_gpio_example"),
-        ("lvcmos25", "axi_gpio_example"),
+        ("nexys video", "axi_gpio_example"),        # Default Nexys Video → GPIO örneği
+        ("lvcmos25", "axi_gpio_example"),           # XDC IOSTANDARD
         ("lvcmos12", "axi_gpio_example"),
-        # gtx_ddr_example
-        ("gtx_ddr_example", "gtx_ddr_example"),
-        ("gtx_ddr", "gtx_ddr_example"),
-        ("aurora_8b10b", "gtx_ddr_example"),
-        ("aurora 8b10b", "gtx_ddr_example"),
+        # GTX Transceiver doğal dil
         ("gtx transceiver", "gtx_ddr_example"),
-        ("create_gtx_ddr", "gtx_ddr_example"),
-        ("create_mb_dma_ddr3", "gtx_ddr_example"),
-        ("8b10b", "gtx_ddr_example"),
-        # hdmi_video_example
-        ("hdmi_video_example", "hdmi_video_example"),
+        ("aurora 8b10b", "gtx_ddr_example"),        # Boşluklu form
+        ("8b10b", "gtx_ddr_example"),               # Kısaltma
+        # HDMI doğal dil
         ("hdmi video", "hdmi_video_example"),
-        ("hdmi_video", "hdmi_video_example"),
-        ("build_hdmi_video", "hdmi_video_example"),
-        ("axi_vdma", "hdmi_video_example"),
-        ("axi vdma", "hdmi_video_example"),
-        ("dvi2rgb", "hdmi_video_example"),
-        ("rgb2dvi", "hdmi_video_example"),
-        ("axi_dynclk", "hdmi_video_example"),
-        ("v_tc", "hdmi_video_example"),
-        ("v_vid_in_axi4s", "hdmi_video_example"),
-        ("v_axi4s_vid_out", "hdmi_video_example"),
+        ("axi vdma", "hdmi_video_example"),         # Boşluklu form (axi_vdma shared!)
         ("1080p", "hdmi_video_example"),
         ("hdmi giriş", "hdmi_video_example"),
         ("hdmi çıkış", "hdmi_video_example"),
-        ("nexys video hdmi", "hdmi_video_example"),
-        # i2c_example
-        ("i2c_example", "i2c_example"),
-        ("create_i2c", "i2c_example"),
-        # pcie_dma_ddr_example
-        ("pcie_dma_ddr", "pcie_dma_ddr_example"),
+        # PCIe doğal dil
         ("pcie dma ddr", "pcie_dma_ddr_example"),
-        ("pcie_dma_ddr_example", "pcie_dma_ddr_example"),
-        # pcie_xdma_mb_example
         ("xdma mb", "pcie_xdma_mb_example"),
-        ("pcie_xdma_mb", "pcie_xdma_mb_example"),
-        ("pcie_xdma_mb_example", "pcie_xdma_mb_example"),
-        # rgmii_example
+        # RGMII doğal dil
         ("rgmii", "rgmii_example"),
-        ("rgmii_example", "rgmii_example"),
-        # spi_example
-        ("spi_example", "spi_example"),
-        ("create_spi", "spi_example"),
-        # uart_example
-        ("uart_example", "uart_example"),
-        ("create_uart", "uart_example"),
-        # v2_mig
-        ("v2_mig", "v2_mig"),
-        ("mb_dma_ddr3", "v2_mig"),
-        # v3_gtx
-        ("v3_gtx", "v3_gtx"),
-        ("mb_dma_mig_gtx", "v3_gtx"),
-        # arty_s7_25_base_rt
-        ("arty_s7_25_base_rt", "arty_s7_25_base_rt"),
+        # Arty S7 doğal dil / kısaltmalar
         ("arty s7", "arty_s7_25_base_rt"),
         ("arty-s7", "arty_s7_25_base_rt"),
         ("arty s7-25", "arty_s7_25_base_rt"),
         ("arty s7 25", "arty_s7_25_base_rt"),
         ("base-rt", "arty_s7_25_base_rt"),
-        ("base_rt", "arty_s7_25_base_rt"),
         ("freertos hello", "arty_s7_25_base_rt"),
-        ("freertos_hello", "arty_s7_25_base_rt"),
-        ("xc7s25", "arty_s7_25_base_rt"),
         ("spartan-7", "arty_s7_25_base_rt"),
         ("spartan 7", "arty_s7_25_base_rt"),
-        # zybo_z7_20_pcam_5c
-        ("zybo_z7_20_pcam_5c", "zybo_z7_20_pcam_5c"),
+        # Zybo doğal dil / kısaltmalar
         ("zybo z7", "zybo_z7_20_pcam_5c"),
         ("zybo-z7", "zybo_z7_20_pcam_5c"),
         ("pcam 5c", "zybo_z7_20_pcam_5c"),
-        ("pcam_5c", "zybo_z7_20_pcam_5c"),
         ("pcam5c", "zybo_z7_20_pcam_5c"),
-        ("ov5640", "zybo_z7_20_pcam_5c"),
         ("mipi csi", "zybo_z7_20_pcam_5c"),
-        ("mipi_csi", "zybo_z7_20_pcam_5c"),
         ("mipi csi-2", "zybo_z7_20_pcam_5c"),
-        ("mipi_d_phy", "zybo_z7_20_pcam_5c"),
         ("dphy", "zybo_z7_20_pcam_5c"),
         ("d-phy", "zybo_z7_20_pcam_5c"),
-        ("xc7z020", "zybo_z7_20_pcam_5c"),
         ("zynq-7000", "zybo_z7_20_pcam_5c"),
         ("zynq 7000", "zybo_z7_20_pcam_5c"),
-        ("processing_system7", "zybo_z7_20_pcam_5c"),
-        ("AXI_BayerToRGB", "zybo_z7_20_pcam_5c"),
-        ("bayertorgb", "zybo_z7_20_pcam_5c"),
-        ("gammacorrection", "zybo_z7_20_pcam_5c"),
-        ("dviclocking", "zybo_z7_20_pcam_5c"),
         ("dviclock", "zybo_z7_20_pcam_5c"),
-        ("pcam_vdma_hdmi", "zybo_z7_20_pcam_5c"),
     ]
+
+    def _build_shared_board_names(self) -> frozenset:
+        """
+        Birden fazla projede kullanılan board adlarını hesapla.
+
+        Yapısal kural: Eğer bir board adı N≥2 projeye aitse, o board adı
+        proje discriminatoru değildir ve routing sinyali olarak kullanılamaz.
+        Ör: "Nexys Video" → 8 proje → sinyal olamaz.
+        Ör: Zybo Z7-20 Pcam board → 1 proje → sinyal olabilir.
+
+        Init'te bir kez hesaplanır. Yeni proje eklendikçe otomatik güncellenir.
+        """
+        from collections import Counter
+        board_counts: Counter = Counter()
+        for node in self.graph.get_all_nodes():
+            if node.get("node_type") != "PROJECT":
+                continue
+            board = (node.get("board", "") or "").strip().lower()
+            if board:
+                board_counts[board] += 1
+                # Normalize varyantlar: "digilent nexys video" → "nexys video"
+                # (ön ek üretici adı çıkarılır)
+                for prefix in ("digilent ", "xilinx ", "avnet ", "trenz "):
+                    if board.startswith(prefix):
+                        short = board[len(prefix):]
+                        if short:
+                            board_counts[short] += 1
+        return frozenset(b for b, c in board_counts.items() if c > 1)
 
     def _build_dynamic_signals(self) -> List[tuple]:
         """
-        Graf'taki PROJECT node'larından dinamik (keyword, project_id) çiftleri üret.
-        Statik _TEXT_PROJECT_SIGNALS ile birleştirir:
-          - Graf node'larından: project_id itself + board name + fpga_part kısaltması
-          - Statik listeden: spesifik IP/bileşen isimleri (aurora_8b10b, dvi2rgb, vb.)
+        (keyword, project_id) sinyal tablosunu üç kaynaktan birleştir:
 
-        100+ proje için: yeni proje GraphStore'a eklenince otomatik kapsanır,
-        bu dosyada güncelleme gerekmez.
+        1. GraphStore PROJECT node'ları: project_id + board adı + fpga_part kısaltması
+        2. FTS5 signals tablosu: index zamanında otomatik çıkarılan UNIQUE keyword'ler
+           (chunk_label, dosya adı, TCL create_bd_cell IP adları)
+        3. _TEXT_PROJECT_SIGNALS statik liste: FTS5'te bulunmayan doğal dil/Türkçe girişler
+
+        100+ proje için: yeni proje eklendiğinde yalnızca GraphStore'a node eklenir,
+        re-index sonrası FTS5 otomatik kapsanır — bu dosyaya dokunmak gerekmez.
         """
         dynamic: List[tuple] = []
         seen_keywords: set = set()
 
+        # ── 1. GraphStore PROJECT node'larından ──────────────────────────────
         for node in self.graph.get_all_nodes():
             if node.get("node_type") != "PROJECT":
                 continue
@@ -866,33 +1131,51 @@ class QueryRouter:
             if not pid:
                 continue
 
-            # project_id: hem altçizgili hem boşluklu form
+            # project_id: altçizgili + boşluklu + tireli form
             for kw in (pid, pid.replace("_", " "), pid.replace("_", "-")):
                 kw = kw.strip().lower()
                 if kw and kw not in seen_keywords:
                     seen_keywords.add(kw)
                     dynamic.append((kw, pid))
 
-            # board adı
+            # board adı — yalnızca o board tek bir projeye özgüyse sinyal olur.
+            # Yapısal kural: shared board names discriminator olamaz.
             board = (node.get("board", "") or "").strip().lower()
-            if board and board not in seen_keywords:
+            if board and board not in seen_keywords and board not in self._shared_board_names:
                 seen_keywords.add(board)
                 dynamic.append((board, pid))
 
-            # fpga_part ilk kısmı (xc7s25csga324-1 → xc7s25)
+            # fpga_part kısaltması (xc7a100tcsg324-1 → xc7a100tcsg324)
             fpga_part = (node.get("fpga_part", "") or "").strip().lower()
             if fpga_part:
-                short = fpga_part.split("-")[0]  # xc7s25csga324 → xc7s25csga324 (no split) or xc7a100t
-                # Sadece 6+ karakter olan unique kısmı ekle
+                short = fpga_part.split("-")[0]
                 if len(short) >= 6 and short not in seen_keywords:
                     seen_keywords.add(short)
                     dynamic.append((short, pid))
 
-        # Statik girişler: spesifik IP isimlerini (aurora_8b10b vb.) kapsıyor.
-        # Çakışmayan statik girişleri sonuna ekle (daha düşük öncelik olsun).
-        static_existing = {kw for kw, _ in dynamic}
+        # ── 2. FTS5 auto-signals: index zamanında çıkarılan UNIQUE keyword'ler ─
+        if self.source_store is not None:
+            try:
+                for kw, proj in self.source_store._fts.get_unique_signals():
+                    if kw not in seen_keywords:
+                        seen_keywords.add(kw)
+                        dynamic.append((kw, proj))
+                        # Underscore ↔ space her iki form
+                        # Yapısal kural: Birden fazla projenin paylaştığı board adı
+                        # varyantları routing sinyali olamaz (shared board ≠ project discriminator).
+                        kw_alt = kw.replace("_", " ") if "_" in kw else kw.replace(" ", "_")
+                        if (kw_alt != kw
+                                and kw_alt not in seen_keywords
+                                and kw_alt not in self._shared_board_names):
+                            seen_keywords.add(kw_alt)
+                            dynamic.append((kw_alt, proj))
+            except Exception:
+                pass  # Source store erişilemez → sessizce devam
+
+        # ── 3. Statik liste: FTS5'te bulunmayan doğal dil / Türkçe girişler ─
         for kw, proj in self.__class__._TEXT_PROJECT_SIGNALS:
-            if kw not in static_existing:
+            if kw not in seen_keywords:
+                seen_keywords.add(kw)
                 dynamic.append((kw, proj))
 
         return dynamic
@@ -939,20 +1222,48 @@ class QueryRouter:
         Çok projeli / danışman sorularda None döner (global arama).
 
         Sıra:
+          0. Exact project_id match → en güçlü sinyal (benzer isimli projeler karışmaz)
           1. Tüm-projeler pattern → None
           2. Metin keyword eşleşmesi → gerçek proje adı
+          2b. Semantic PROJECT node araması → keyword gerektirmez, tüm projeler için çalışır
           3. Vector node_id voting fallback
         """
         q_lower = question.lower()
+
+        # Tier 0: Exact project ID match — en kesin sinyal
+        # Soruda "nexys_4_abacus" veya "nexys 4 abacus" geçiyorsa direkt döndür.
+        # Benzer isimli projeler (arty_s7_25 vs arty_s7_50) için longest-match kazanır.
+        exact = self._exact_project_match(question)
+        if exact:
+            return exact
 
         # Tier 1: Tüm projeler isteniyor → filtre yok
         if self._ALL_PROJECTS_RE.search(q_lower):
             return None
 
-        # Tier 2: Spesifik proje keyword eşleşmesi
+        # Tier 2: Spesifik proje keyword eşleşmesi — longest-match-wins
+        # Sinyaller _build_dynamic_signals()'da len(keyword) DESC sıralanır.
+        # Uzun keyword = daha özgün sinyal → daha önce değerlendirilir.
+        # "nexys a7" (8 kar.) her zaman "uart" (4 kar.) önünde bulunur.
         for keyword, project in self._TEXT_PROJECT_SIGNALS:
             if keyword in q_lower:
                 return project
+
+        # Tier 2b: Semantic PROJECT node araması (keyword bağımsız)
+        # VectorStore'daki PROJECT node'larını semantik olarak sorgular.
+        # Yeni proje eklendiğinde keyword listesine dokunmadan otomatik çalışır.
+        # Graph PROJECT node'u olmayan projeler için Tier 3'e düşer.
+        try:
+            proj_hits = self.vector.query(question, n_results=3,
+                                          node_type_filter="PROJECT")
+            if proj_hits:
+                top = proj_hits[0]
+                pid = top["node_id"]
+                # Yalnızca güçlü semantic eşleşme — düşük skor proje tespiti için yeterli değil
+                if top["similarity"] >= 0.45 and pid not in self._stale_ids:
+                    return pid
+        except Exception:
+            pass  # Vector store erişilemez → sessizce Tier 3'e geç
 
         # Tier 3: Vector node_id voting fallback
         return self._infer_project(vector_hits)
@@ -1142,19 +1453,28 @@ class QueryRouter:
         project: Optional[str],
     ) -> List[Dict]:
         """
-        Belirlenen proje dışındaki PROJECT node'larını kaldır.
-        COMPONENT/REQUIREMENT gibi non-PROJECT node'lar dokunulmaz
-        (bu node'larda project field'ı genellikle yok).
-        CROSSREF sorgularında ÇAĞRILMAMALI — cross-project bilgi kasıtlı isteniyor.
+        Proje-spesifik node'ları filtrele:
+        - project tespit edildi → PROJECT/DECISION/EVIDENCE/REQUIREMENT/ISSUE
+          sadece o projeye ait olanlar geçer.
+        - project tespit edilmedi → DECISION/EVIDENCE/REQUIREMENT/ISSUE hiçbiri
+          geçmez (genel sorgulara proje-spesifik analiz node'ları karışmasın).
+        CROSSREF sorgularında ÇAĞRILMAMALI.
         """
-        if not project:
-            return graph_nodes
+        _PROJECT_SPECIFIC = {"DECISION", "EVIDENCE", "REQUIREMENT", "ISSUE", "COMPONENT"}
         result = []
         for n in graph_nodes:
             ntype = n.get("node_type", "")
-            nid = n.get("node_id", "")
-            if ntype == "PROJECT" and nid != project:
-                continue  # başka proje node'u — çıkar
+            nid   = n.get("node_id", "")
+            nproj = n.get("project", "")
+
+            if ntype == "PROJECT":
+                if project and nid != project:
+                    continue  # başka proje PROJECT node'u
+            elif ntype in _PROJECT_SPECIFIC:
+                if not project:
+                    continue  # proje tespitsiz genel sorgu — çıkar
+                if nproj and nproj != project:
+                    continue  # başka projenin analiz node'u — çıkar
             result.append(n)
         return result
 

@@ -6,7 +6,7 @@ Separate from production "documents" collection (4.15M chunks, 14 GB).
 This collection stores graph node embeddings only.
 
 Config:
-  DB path     : db/chroma_graph_nodes/   (isolated from chroma_db/)
+  DB path     : db/chroma_v2/   (isolated from chroma_db/)
   Collection  : fpga_rag_v2_nodes
   Metric      : cosine
   Embedding   : paraphrase-multilingual-mpnet-base-v2, 768-dim (multilingual)
@@ -16,40 +16,20 @@ Config:
 
 from __future__ import annotations
 
-import sys
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import chromadb
 
-# Lazy-load sentence_transformers to avoid import cost at module level
-_embedder = None
+from rag_v2.embedder import embed_text as _embed_text, embed_texts as _embed_texts
 
 
 def _get_embedder():
-    global _embedder
-    if _embedder is None:
-        # Use the project's existing SentenceEmbeddings if available
-        proj_root = Path(__file__).parent.parent.parent
-        src_path = str(proj_root / "src")
-        if src_path not in sys.path:
-            sys.path.insert(0, src_path)
-        try:
-            from rag.sentence_embeddings import SentenceEmbeddings
-            _embedder = SentenceEmbeddings(model_name="paraphrase-multilingual-mpnet-base-v2")
-        except ImportError:
-            import os
-            from sentence_transformers import SentenceTransformer
-            os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
-            _model = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2", device="cpu")
-            class _Wrapper:
-                def embed_text(self, text):
-                    return _model.encode(text).tolist()
-                def embed_texts(self, texts):
-                    return _model.encode(texts).tolist()
-            _embedder = _Wrapper()
-    return _embedder
+    """Geriye dönük uyumluluk — shared embedder modülünü wrap eder."""
+    class _Compat:
+        def embed_text(self, text):   return _embed_text(text)
+        def embed_texts(self, texts): return _embed_texts(texts)
+    return _Compat()
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +75,7 @@ class VectorStoreV2:
 
     def __init__(
         self,
-        persist_directory: str = "db/chroma_graph_nodes",
+        persist_directory: str = "db/chroma_v2",
         threshold: float = DEFAULT_THRESHOLD,
     ):
         self._persist_dir = Path(persist_directory)

@@ -140,6 +140,20 @@ def load_rag_v2():
     stats = gs.stats()
     stats["source_chunks"] = sc.count() if sc else 0
     stats["doc_chunks"] = ds.count() if ds else 0
+
+    # Embedding model pre-warm: ilk sorgu bekleme süresini azalt.
+    # FTS5 disk-persistent olduğundan cold-start yok (sadece embedding modeli yüklenir).
+    import threading
+    def _warmup():
+        try:
+            if sc:
+                sc.search("vivado clock constraint", n_results=1)
+            if ds:
+                ds.search("vivado timing constraint", n_results=1)
+        except Exception:
+            pass
+    threading.Thread(target=_warmup, daemon=True).start()
+
     return gs, vs, router, gate, stats, sc
 
 

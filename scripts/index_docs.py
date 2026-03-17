@@ -2,23 +2,69 @@
 """
 index_docs.py — Vivado/Vitis UG dökümanlarını DocStore'a index'le
 ===================================================================
-Seçili Xilinx PDF'lerini db/chroma_docs/ koleksiyonuna ekler.
+Xilinx PDF'lerini db/chroma_docs/ koleksiyonuna ekler.
+docs/ dizinindeki tüm PDF'leri otomatik tarar, zaten index'lileri atlar.
 
 Kullanım:
     cd /home/test123/GC-RAG-VIVADO-2
     source .venv/bin/activate
-    python scripts/index_docs.py              # sadece yeni/eksik olanları ekle
+    python scripts/index_docs.py              # yeni/eksik olanları ekle (docs/ + catalog)
     python scripts/index_docs.py --reset      # koleksiyonu sıfırlayıp yeniden index'le
     python scripts/index_docs.py --list       # hangi dökümanlar index'li?
     python scripts/index_docs.py --dry-run    # chunk sayısını tahmin et (eklemez)
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Otomatik tarama — docs/ dizinindeki tüm PDF'leri bul
+# ─────────────────────────────────────────────────────────────────────────────
+
+_DOCS_DIR = Path("/home/test123/fpga_asist_dev/validation_test/Vitis_Products/docs")
+_DOC_ID_RE = re.compile(r'(ug|xapp|wp|xcn|pg|oslib)(\d+)', re.IGNORECASE)
+
+
+def _derive_doc_id(path: Path) -> str:
+    """Dosya adından doc_id üret. ug901-vivado-synthesis.pdf → 'ug901'"""
+    stem = path.stem.lower()
+    m = _DOC_ID_RE.search(stem)
+    if m:
+        return m.group(0).lower()
+    # Fallback: stem'in ilk 20 karakteri, özel karakter → _
+    return re.sub(r'[^\w]', '_', stem)[:20].strip('_')
+
+
+def _derive_doc_title(path: Path, doc_id: str) -> str:
+    """Dosya adından okunabilir başlık üret."""
+    stem = path.stem
+    # doc_id ve sayısal önekleri kaldır, tire/alt çizgi → boşluk
+    title = re.sub(r'^[a-z_]*[-_]', '', stem, flags=re.IGNORECASE)
+    title = re.sub(r'[-_]', ' ', title).title()
+    return f"{title} ({doc_id.upper()})"
+
+
+def _auto_scan_catalog() -> list:
+    """docs/ dizinindeki tüm PDF'leri tarayıp katalog girişleri üret."""
+    if not _DOCS_DIR.exists():
+        return []
+    entries = []
+    for pdf in sorted(_DOCS_DIR.glob("*.pdf")):
+        doc_id = _derive_doc_id(pdf)
+        doc_title = _derive_doc_title(pdf, doc_id)
+        entries.append({
+            "doc_id": doc_id,
+            "doc_title": doc_title,
+            "path": pdf,
+            "category": "auto",
+        })
+    return entries
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Döküman kataloğu — eklenecek PDF'ler ve metadata
@@ -27,6 +73,21 @@ sys.path.insert(0, str(_ROOT / "src"))
 _VITIS_DIR = Path("/home/test123/fpga_asist_dev/validation_test/Vitis_Products")
 
 DOC_CATALOG = [
+    # ── AXI IP Product Guides ─────────────────────────────────────────────────
+    # NOT: PG020 (AXI VDMA) Xilinx/AMD sitesinden indirilip şu konuma yerleştirilmeli:
+    # /home/test123/fpga_asist_dev/validation_test/Vitis_Products/Vivado/pg020-axi-vdma.pdf
+    {
+        "doc_id": "pg020",
+        "doc_title": "AXI Video Direct Memory Access v6.3 Product Guide (PG020)",
+        "path": _VITIS_DIR / "Vivado/pg020-axi-vdma.pdf",
+        "category": "axi_ip",
+    },
+    {
+        "doc_id": "pg059",
+        "doc_title": "AXI Interconnect v2.1 Product Guide (PG059)",
+        "path": _VITIS_DIR / "Vivado/pg059-axi-interconnect.pdf",
+        "category": "axi_ip",
+    },
     # ── Vivado Synthesis & Implementation ────────────────────────────────────
     {
         "doc_id": "ug901",
@@ -104,12 +165,37 @@ DOC_CATALOG = [
 ]
 
 
+_PDF_DIR = _ROOT / "data" / "pdfs"
+_XILINX_PREFIXES = ["ug", "pg", "xapp", "wp", "ds"]
+
+
+def _scan_xilinx_pdfs() -> list:
+    """data/pdfs/ altındaki Xilinx UG/PG/XAPP/WP/DS PDF'lerini tara."""
+    if not _PDF_DIR.exists():
+        return []
+    entries = []
+    for pdf in sorted(_PDF_DIR.rglob("*.pdf")):
+        name = pdf.name.lower()
+        if any(name.startswith(px) for px in _XILINX_PREFIXES):
+            doc_id = _derive_doc_id(pdf)
+            doc_title = _derive_doc_title(pdf, doc_id)
+            entries.append({
+                "doc_id": doc_id,
+                "doc_title": doc_title,
+                "path": pdf,
+                "category": "xilinx_ref",
+            })
+    return entries
+
+
 def main():
     parser = argparse.ArgumentParser(description="DocStore PDF indexer")
-    parser.add_argument("--reset",   action="store_true", help="Koleksiyonu sıfırla ve yeniden index'le")
-    parser.add_argument("--list",    action="store_true", help="Index'li dökümanları listele")
-    parser.add_argument("--dry-run", action="store_true", help="Index'lemeden önce chunk tahmini yap")
-    parser.add_argument("--category", default="", help="Sadece bu kategorideki dökümanları index'le")
+    parser.add_argument("--reset",        action="store_true", help="Koleksiyonu sıfırla ve yeniden index'le")
+    parser.add_argument("--list",         action="store_true", help="Index'li dökümanları listele")
+    parser.add_argument("--dry-run",      action="store_true", help="Index'lemeden önce chunk tahmini yap")
+    parser.add_argument("--category",     default="",          help="Sadece bu kategorideki dökümanları index'le")
+    parser.add_argument("--pdfs",         action="store_true", help="data/pdfs/ Xilinx PDF'lerini tara")
+    parser.add_argument("--xilinx-only",  action="store_true", help="--pdfs ile: sadece UG/PG/XAPP/WP/DS")
     args = parser.parse_args()
 
     from rag_v2.doc_store import DocStore
@@ -131,7 +217,25 @@ def main():
             print("✓ chroma_docs koleksiyonu sıfırlandı.")
         ds = DocStore()  # yeniden başlat
 
-    catalog = DOC_CATALOG
+    # data/pdfs/ Xilinx PDF taraması (--pdfs flag)
+    if args.pdfs:
+        xilinx_pdfs = _scan_xilinx_pdfs()
+        print(f"data/pdfs/ taraması: {len(xilinx_pdfs)} Xilinx PDF (UG/PG/XAPP/WP/DS)")
+        combined: dict = {e["doc_id"]: e for e in xilinx_pdfs}
+        for e in DOC_CATALOG:
+            combined[e["doc_id"]] = e
+        catalog = list(combined.values())
+        print(f"Tarandı: {len(xilinx_pdfs)} Xilinx PDF + {len(DOC_CATALOG)} katalog girişi → toplam {len(catalog)} benzersiz döküman")
+    else:
+        # docs/ dizinini otomatik tara + hardcoded catalog birleştir
+        auto = _auto_scan_catalog()
+        # doc_id → entry (auto önce, catalog sonra — catalog override eder title için)
+        combined: dict = {e["doc_id"]: e for e in auto}
+        for e in DOC_CATALOG:
+            combined[e["doc_id"]] = e  # catalog varsa title/path override
+        catalog = list(combined.values())
+        print(f"Tarandı: {len(auto)} PDF docs/ dizininde, {len(DOC_CATALOG)} katalog girişi → toplam {len(catalog)} benzersiz döküman")
+
     if args.category:
         catalog = [d for d in catalog if d["category"] == args.category]
         print(f"Kategori filtresi: '{args.category}' — {len(catalog)} döküman")

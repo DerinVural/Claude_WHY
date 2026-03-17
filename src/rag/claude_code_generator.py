@@ -102,7 +102,7 @@ class ClaudeCodeGenerator:
     ClaudeGenerator ile birebir aynı metot imzaları.
     """
 
-    def __init__(self, model_name: str = "claude-sonnet-4-6", timeout: int = 120):
+    def __init__(self, model_name: str = "claude-sonnet-4-6", timeout: int = 240):
         self.model_name = model_name
         self.timeout = timeout
 

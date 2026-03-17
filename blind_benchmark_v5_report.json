@@ -1,0 +1,904 @@
+{
+  "timestamp": "2026-03-13T10:51:20.427589",
+  "version": "v5",
+  "total_score": 0.911,
+  "overall_grade": "A",
+  "elapsed_s": 786.5,
+  "n_questions": 24,
+  "categories": [
+    {
+      "category": "how_new_project",
+      "label": "HOW New Project  (IP Integrator sıfırdan proje)",
+      "score": 0.945,
+      "grade": "A",
+      "n_questions": 5,
+      "questions": [
+        {
+          "id": "HNP-01",
+          "category": "how_new_project",
+          "project": "general",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "create_project",
+            "block design",
+            "MicroBlaze",
+            "wrapper",
+            "create_bd_design",
+            "IP Integrator",
+            "make_wrapper"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "create_project",
+            "MicroBlaze",
+            "wrapper"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "Arty-S7-25-Master.xdc"
+          ],
+          "query_type": "How",
+          "route_ok": true,
+          "answer_snippet": "Referans projelerdeki (`axi_gpio_example`, `nexys_a7_dma_audio`) pattern ve kaynak dosyalarına dayanarak adım adım süreç:\n\n---\n\n## Vivado MicroBlaze Tabanlı Proje Oluşturma Adımları\n\n### 1. Proje Oluşturma (TCL veya GUI)\n\n**[PAT-B-003]** — CLI-first yaklaşım (önerilen):\n```tcl\nvivado -mode batch -so",
+          "ground_truth": "UG912/UG898: create_project → create_bd_design → add MicroBlaze → Run Block Automation → make_wrapper → launch_runs"
+        },
+        {
+          "id": "HNP-02",
+          "category": "how_new_project",
+          "project": "general",
+          "type": "real",
+          "score": 0.9,
+          "term_hits": [
+            "create_bd_cell",
+            "connect_bd_intf_net",
+            "axi_gpio",
+            "S_AXI",
+            "AXI GPIO"
+          ],
+          "term_misses": [
+            "axi_interconnect"
+          ],
+          "val_hits": [
+            "create_bd_cell",
+            "connect_bd_intf_net",
+            "axi_gpio"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "ZyboZ7_A.xdc",
+            "system.tcl"
+          ],
+          "query_type": "How",
+          "route_ok": true,
+          "answer_snippet": "**axi_gpio_example** projesinin graph metadata'sı ve TCL pattern'lerinden türetilen adımlar:\n\n---\n\n## 1. IP Bloğunu Block Design'a Ekle\n\n```tcl\n# AXI GPIO IP ekle (vlnv: xilinx.com:ip:axi_gpio:2.0)\nset axi_gpio_0 [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio:2.0 axi_gpio_0]\n\n# Parametrelerin",
+          "ground_truth": "UG994/UG912: create_bd_cell xilinx.com:ip:axi_gpio → connect_bd_intf_net ile S_AXI → AXI interconnect"
+        },
+        {
+          "id": "HNP-03",
+          "category": "how_new_project",
+          "project": "general",
+          "type": "real",
+          "score": 0.9,
+          "term_hits": [
+            "Run Block Automation",
+            "Run Connection Automation",
+            "automation",
+            "AXI",
+            "bağlantı"
+          ],
+          "term_misses": [
+            "MicroBlaze"
+          ],
+          "val_hits": [
+            "Run Block Automation",
+            "Run Connection Automation"
+          ],
+          "val_misses": [],
+          "source_chunks": 15,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "synthesize_uart.tcl",
+            "validate_uart_gui.tcl",
+            "connection_automation.tcl",
+            "create_uart_project.tcl",
+            "validate_uart_bd_gui.tcl",
+            "fix_connections_manual.tcl",
+            "simulate_uart.tcl",
+            "autostart_uart_bd_validation.tcl",
+            "autostart_uart_validation.tcl",
+            "create_uart_bd.tcl"
+          ],
+          "query_type": "How",
+          "route_ok": true,
+          "answer_snippet": "## Run Block Automation vs Run Connection Automation\n\n### Temel Fark\n\n| | Block Automation | Connection Automation |\n|---|---|---|\n| **Ne yapar** | IP bloğunu **yapılandırır** (parametre atar, port ekler) | IP blokları **arasını bağlar** (sinyal, saat, reset, AXI) |\n| **Ne zaman çıkar** | IP block d",
+          "ground_truth": "UG994: Block Automation önce (MicroBlaze local memory/debug kurar), Connection Automation sonra (AXI bağlantıları tamamlar)"
+        },
+        {
+          "id": "HNP-04",
+          "category": "how_new_project",
+          "project": "general",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "make_wrapper",
+            "wrapper",
+            "HDL",
+            "top-level",
+            "add_files",
+            "set_property top"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "make_wrapper",
+            "wrapper"
+          ],
+          "val_misses": [],
+          "source_chunks": 4,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "create_axi_auto.tcl",
+            "create_i2c_with_xdc.tcl",
+            "create_uart_bd.tcl",
+            "create_minimal_microblaze.tcl"
+          ],
+          "query_type": "Why",
+          "route_ok": true,
+          "answer_snippet": "## Block Design HDL Wrapper Oluşturma\n\n### `make_wrapper` Nedir?\n\nVivado'da bir Block Design (`.bd` dosyası) doğrudan sentezlenemez — önce standart bir HDL modülüne sarmalanması gerekir. `make_wrapper` komutu bu sarmalayıcı dosyayı otomatik üretir.\n\n**Üretilen dosya:** `<bd_name>_wrapper.v` (veya `.",
+          "ground_truth": "UG895/UG894: make_wrapper -files [get_files *.bd] -top → add_files → set_property top"
+        },
+        {
+          "id": "HNP-05",
+          "category": "how_new_project",
+          "project": "general",
+          "type": "real",
+          "score": 0.925,
+          "term_hits": [
+            "clk_wiz",
+            "CLKOUT1",
+            "CLKOUT2",
+            "CLKOUT1_REQUESTED_OUT_FREQ",
+            "50",
+            "25",
+            "Clocking Wizard"
+          ],
+          "term_misses": [
+            "CLK_IN1"
+          ],
+          "val_hits": [
+            "clk_wiz",
+            "50",
+            "25"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "mig_7series_v4_1_infrastructure.v",
+            "mig_7series_0_mig_sim.vhd",
+            "BRAM_cache_bd.tcl",
+            "clk_main_bd.tcl",
+            "clk_video_bd.tcl",
+            "rpu_top.vhd",
+            "clocking.vhd",
+            "mig_7series_0_mig.vhd",
+            "spi_master.vhd"
+          ],
+          "query_type": "What",
+          "route_ok": true,
+          "answer_snippet": "Context'teki kaynak dosyalar ve graph metadata'dan yola çıkarak yanıt veriyorum.\n\n## Clocking Wizard — 100 MHz → 50 MHz + 25 MHz Parametreleri\n\n### Referans Projelerden Gözlem\n\n| Proje | Giriş | Çıkış(lar) | Primitif |\n|-------|-------|-----------|---------|\n| `nexys_a7_dma_audio` | 100 MHz | 140.62",
+          "ground_truth": "PG065: CONFIG.CLKOUT1_REQUESTED_OUT_FREQ 50 CONFIG.CLKOUT2_REQUESTED_OUT_FREQ 25 CONFIG.USE_LOCKED 1"
+        }
+      ]
+    },
+    {
+      "category": "how_synthesis",
+      "label": "HOW Synthesis    (sentez/impl/bitstream workflow)",
+      "score": 0.865,
+      "grade": "A",
+      "n_questions": 4,
+      "questions": [
+        {
+          "id": "HS-01",
+          "category": "how_synthesis",
+          "project": "general",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "launch_runs",
+            "wait_on_run",
+            "open_run",
+            "synth_1",
+            "impl_1",
+            "jobs"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "launch_runs",
+            "wait_on_run",
+            "synth_1"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "run_synthesis.tcl",
+            "validate_uart_gui.tcl",
+            "run_v3_synthesis_full.tcl",
+            "run_v2_synth_only.tcl",
+            "build_project.tcl",
+            "validate_spi_bd_gui.tcl",
+            "create_axi_with_xdc.tcl",
+            "README_V2.md",
+            "auto_v2_final.tcl",
+            "run_hdmi_synthesis.tcl"
+          ],
+          "query_type": "Trace",
+          "route_ok": true,
+          "answer_snippet": "## Vivado TCL: Sentez ve Implementation Akışı\n\n### Temel Komut Sırası\n\n```tcl\n# 1. Projeyi aç (GUI'de zaten açıksa gerekmiyor)\nopen_project \"path/to/project.xpr\"\n\n# 2. Sentezi başlat\nreset_run synth_1\nlaunch_runs synth_1 -jobs 8\nwait_on_run synth_1\n\n# 3. Durumu kontrol et\nset synth_status [get_prope",
+          "ground_truth": "UG894: launch_runs synth_1 -jobs 4 → wait_on_run synth_1 → launch_runs impl_1 → wait_on_run impl_1"
+        },
+        {
+          "id": "HS-02",
+          "category": "how_synthesis",
+          "project": "general",
+          "type": "real",
+          "score": 0.767,
+          "term_hits": [
+            "open_hw_manager",
+            "open_hw_target",
+            "program_hw_devices",
+            "get_hw_devices",
+            "bitstream"
+          ],
+          "term_misses": [
+            "write_bitstream"
+          ],
+          "val_hits": [
+            "open_hw_manager",
+            "program_hw_devices"
+          ],
+          "val_misses": [
+            "write_bitstream"
+          ],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "build.tcl",
+            "prep_v2_gui.tcl",
+            "xspips_hw.h",
+            "xqspips.h",
+            "README.md",
+            "add_peripherals_to_v1.tcl",
+            "xgpiops_hw.h",
+            "README_V2.md",
+            "SYNTHESIS_RESULTS.md"
+          ],
+          "query_type": "How",
+          "route_ok": true,
+          "answer_snippet": "Context'teki `hdmi_video_example/README.md` (satır 204-227) bu adımları doğrudan gösteriyor:\n\n## Bitstream → FPGA Programlama Adımları\n\n### TCL Komut Dizisi\n\n```tcl\nopen_hw_manager\nconnect_hw_server\nopen_hw_target\nset_property PROGRAM.FILE {hdmi_video_system.bit} [get_hw_devices]\nprogram_hw_devices ",
+          "ground_truth": "UG908: write_bitstream → open_hw_manager → connect_hw_server → open_hw_target → program_hw_devices"
+        },
+        {
+          "id": "HS-03",
+          "category": "how_synthesis",
+          "project": "axi_gpio_example",
+          "type": "real",
+          "score": 0.695,
+          "term_hits": [
+            "read_verilog",
+            "synth_design",
+            "opt_design",
+            "place_design",
+            "route_design"
+          ],
+          "term_misses": [
+            "read_xdc",
+            "write_bitstream"
+          ],
+          "val_hits": [
+            "synth_design",
+            "place_design"
+          ],
+          "val_misses": [
+            "write_bitstream"
+          ],
+          "source_chunks": 11,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "create_minimal_microblaze.tcl",
+            "create_axi_auto.tcl",
+            "run_synthesis.tcl",
+            "create_axi_simple.tcl",
+            "add_axi_gpio.tcl",
+            "create_axi_with_xdc.tcl",
+            "SYNTHESIS_RESULTS.md"
+          ],
+          "query_type": "How",
+          "route_ok": true,
+          "answer_snippet": "Context'te yalnızca **project-mode** TCL script'leri bulunuyor. Non-project mode adımları referans projelerde yer almıyor — bu konuda uydurma yapmayacağım.\n\n---\n\n## Context'te Bulunan: Project-Mode Synthesis\n\n`validation_test/axi_example/run_synthesis.tcl` dosyasından doğrudan adımlar:\n\n```tcl\n# ADI",
+          "ground_truth": "UG901/UG904: read_verilog → read_xdc → synth_design -top → opt_design → place_design → route_design → write_bitstream"
+        },
+        {
+          "id": "HS-04",
+          "category": "how_synthesis",
+          "project": "general",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "report_timing_summary",
+            "report_clock_interaction",
+            "timing",
+            "setup",
+            "hold",
+            "WNS",
+            "WHS"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "report_timing_summary",
+            "timing"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "run_synthesis.tcl",
+            "run_v3_synthesis_full.tcl",
+            "synthesis_simple.tcl",
+            "create_axi_with_xdc.tcl",
+            "create_axi_auto.tcl",
+            "create_i2c_with_xdc.tcl",
+            "ebaz4205.tcl",
+            "pcie_synthesis_test.tcl",
+            "run_hdmi_synthesis.tcl"
+          ],
+          "query_type": "How",
+          "route_ok": true,
+          "answer_snippet": "## Vivado Timing Analizi: \"Timing Not Met\" Adım Adım\n\n### 1. Sentez Sonrası Temel Kontrol\n\nContext'teki projelerde WNS (Worst Negative Slack) kontrolü şu şekilde yapılıyor:\n\n```tcl\n# v3_gtx/run_v3_synthesis_full.tcl — Sentez başarı sonrası\nopen_run synth_1\n\nset wns [get_property SLACK [get_timing_pa",
+          "ground_truth": "UG903/UG904: report_timing_summary -delay_type max_min → WNS/WHS analizi → set_multicycle_path / false_path düzeltmeleri"
+        }
+      ]
+    },
+    {
+      "category": "how_constraints",
+      "label": "HOW Constraints  (XDC, timing, pin atama)",
+      "score": 1.0,
+      "grade": "A",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "HC-01",
+          "category": "how_constraints",
+          "project": "general",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "set_property",
+            "PACKAGE_PIN",
+            "IOSTANDARD",
+            "SLEW",
+            "get_ports",
+            "LVCMOS33"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "set_property",
+            "PACKAGE_PIN",
+            "IOSTANDARD"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "main.c",
+            "Cmod-S7-25-Master.xdc"
+          ],
+          "query_type": "How",
+          "route_ok": true,
+          "answer_snippet": "## Vivado XDC Pin Atama Komutu\n\n### Temel Komut: `set_property -dict`\n\nXDC dosyasında pin atama için standart komut:\n\n```tcl\nset_property -dict { PACKAGE_PIN <pin>  IOSTANDARD <standart> } [get_ports { <port_adı> }]\n```\n\nBirden fazla özelliği tek seferde `-dict` ile atamak en yaygın pratiktir.\n\n---\n",
+          "ground_truth": "UG903: set_property PACKAGE_PIN X [get_ports sig] → set_property IOSTANDARD LVCMOS33 [get_ports sig]"
+        },
+        {
+          "id": "HC-02",
+          "category": "how_constraints",
+          "project": "general",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "create_clock",
+            "period",
+            "10",
+            "get_ports",
+            "waveform",
+            "100 MHz",
+            "constraint"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "create_clock",
+            "period",
+            "10"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "How",
+          "route_ok": true,
+          "answer_snippet": "## `create_clock` — Vivado Timing Constraint\n\n### Temel Sözdizimi\n\n```tcl\ncreate_clock -period <süre_ns> -name <isim> [get_ports <port>]\n```\n\n| Parametre | Açıklama |\n|-----------|----------|\n| `-period` | Saat periyodu **nanosaniye** cinsinden (zorunlu) |\n| `-name` | Kısıtlamaya sembolik isim (iste",
+          "ground_truth": "UG903: create_clock -period 10.000 -name sys_clk [get_ports clk] — 100MHz = 10ns period"
+        },
+        {
+          "id": "HC-03",
+          "category": "how_constraints",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "E3",
+            "CLK100MHZ",
+            "LVCMOS33",
+            "PACKAGE_PIN",
+            "create_clock",
+            "100"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "E3",
+            "CLK100MHZ",
+            "LVCMOS33"
+          ],
+          "val_misses": [],
+          "source_chunks": 18,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "Nexys-A7-100T-Master.xdc",
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "route_ok": true,
+          "answer_snippet": "**nexys_a7_dma_audio / Nexys-A7-100T-Master.xdc — 100 MHz Sistem Saati**\n\nKaynak dosyadaki clock constraint satırı **yorumludur (devre dışı)**:\n\n```tcl\n#set_property -dict { PACKAGE_PIN E3    IOSTANDARD LVCMOS33 } [get_ports { CLK100MHZ }];\n#create_clock -add -name sys_clk_pin -period 10.00 -wavefor",
+          "ground_truth": "Master.xdc: PACKAGE_PIN E3 get_ports CLK100MHZ, IOSTANDARD LVCMOS33, create_clock -period 10.000"
+        }
+      ]
+    },
+    {
+      "category": "how_ip_config",
+      "label": "HOW IP Config    (IP parametre ayarlama)",
+      "score": 0.943,
+      "grade": "A",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "HIC-01",
+          "category": "how_ip_config",
+          "project": "general",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "set_property",
+            "CONFIG",
+            "axi_dma",
+            "c_include_sg",
+            "get_bd_cells",
+            "1"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "set_property",
+            "CONFIG",
+            "c_include_sg"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "How",
+          "route_ok": true,
+          "answer_snippet": "Kaynak dosyada somut veriler bulundu. Yanıtı oluşturuyorum.\n\n---\n\n## Vivado IP Integrator — TCL ile IP Parametre Ayarlama\n\n### Temel Sözdizimi\n\nIP Integrator'da bir IP bloğunun parametrelerini ayarlamak için iki yöntem kullanılır:\n\n**Yöntem 1 — `set_property -dict` (birden fazla parametre, tercih ed",
+          "ground_truth": "UG994: set_property -dict [list CONFIG.c_include_sg {1}] [get_bd_cells axi_dma_0]"
+        },
+        {
+          "id": "HIC-02",
+          "category": "how_ip_config",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.829,
+          "term_hits": [
+            "mig_7series",
+            "DDR2",
+            "3077",
+            "16",
+            "MIG"
+          ],
+          "term_misses": [
+            "clock_period",
+            "DATA_WIDTH"
+          ],
+          "val_hits": [
+            "mig_7series",
+            "DDR2",
+            "3077"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "How",
+          "route_ok": true,
+          "answer_snippet": "**nexys_a7_dma_audio — MIG 7 Series DDR2 Konfigürasyonu**\n\nKaynak: `COMP-A-mig_7series_0` (graph node) + `nexys-a7_rm.pdf`\n\n---\n\n**Clock Konfigürasyonu**\n\n| Parametre | Değer | Kaynak |\n|-----------|-------|--------|\n| `sys_clk_i` girişi | **140.625 MHz** (clk_wiz_0 CLKOUT1'den) | graph: COMP-A-mig_",
+          "ground_truth": "design_1.tcl: mig_7series_0 CONFIG — DDR2, clock_period=3077ps, DATA_WIDTH=16"
+        },
+        {
+          "id": "HIC-03",
+          "category": "how_ip_config",
+          "project": "general",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "axi_interconnect",
+            "NUM_MI",
+            "NUM_SI",
+            "master",
+            "slave",
+            "AXI Interconnect"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "axi_interconnect",
+            "NUM_MI",
+            "NUM_SI"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "README.md",
+            "design_1.tcl",
+            "design_1.tcl",
+            "design_1.tcl",
+            "design_1_bd.tcl",
+            "Arty_Z7_20_bd.tcl",
+            "system.tcl",
+            "design_1.tcl",
+            "hdmi_in.tcl",
+            "system.tcl"
+          ],
+          "query_type": "CrossRef",
+          "route_ok": true,
+          "answer_snippet": "## AXI Interconnect: NUM_MI ve NUM_SI Parametreleri\n\n### Temel Kavram\n\n**NUM_SI** (Number of Slave Interfaces) = Interconnect'e **giren** (upstream) master sayısı — yani veri *gönderen* taraf.\n**NUM_MI** (Number of Master Interfaces) = Interconnect'ten **çıkan** (downstream) slave sayısı — yani veri",
+          "ground_truth": "PG059: CONFIG.NUM_MI=1 (master count), CONFIG.NUM_SI=N (slave/peripheral count)"
+        }
+      ]
+    },
+    {
+      "category": "what_concepts",
+      "label": "WHAT Concepts    (kavramsal UG sorguları)",
+      "score": 0.81,
+      "grade": "A",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "WC-01",
+          "category": "what_concepts",
+          "project": "general",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "Block Automation",
+            "MicroBlaze",
+            "LMB",
+            "BRAM",
+            "MDM",
+            "local memory",
+            "debug"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "Block Automation",
+            "MicroBlaze",
+            "LMB"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "fix_connections_manual.tcl",
+            "connection_automation.tcl",
+            "validate_uart_bd_gui.tcl",
+            "create_uart_bd.tcl"
+          ],
+          "query_type": "Trace",
+          "route_ok": true,
+          "answer_snippet": "## Vivado IP Integrator — Block Automation\n\n**Block Automation**, bir IP bloğu (özellikle MicroBlaze) ekledikten sonra Vivado'nun sunduğu sihirbaz tabanlı bir özelliktir. \"Run Block Automation\" tıklandığında, seçilen IP için gerekli tüm destek bileşenlerini otomatik olarak oluşturur ve bağlar.\n\n### ",
+          "ground_truth": "UG994: Block Automation ekler: LMB BRAM controller, LMB v1.0, MDM (debug), proc_sys_reset"
+        },
+        {
+          "id": "WC-02",
+          "category": "what_concepts",
+          "project": "general",
+          "type": "real",
+          "score": 0.829,
+          "term_hits": [
+            "AXI4",
+            "AXI4-Lite",
+            "AXI4-Stream",
+            "burst",
+            "register"
+          ],
+          "term_misses": [
+            "throughput",
+            "streaming"
+          ],
+          "val_hits": [
+            "AXI4",
+            "AXI4-Lite",
+            "AXI4-Stream"
+          ],
+          "val_misses": [],
+          "source_chunks": 2,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "README_V2.md",
+            "axi4stream_sinker.v"
+          ],
+          "query_type": "CrossRef",
+          "route_ok": true,
+          "answer_snippet": "Context'teki projelerden somut kanıtlarla açıklayayım:\n\n---\n\n## AXI4 vs AXI4-Lite vs AXI4-Stream\n\n### Protokol Karşılaştırması\n\n| Özellik | AXI4 | AXI4-Lite | AXI4-Stream |\n|---|---|---|---|\n| Kanal | 5 kanal (AW/W/AR/R/B) | 5 kanal | 1 tek yönlü kanal |\n| Burst | Evet (256'ya kadar) | **Hayır** | Y",
+          "ground_truth": "PG059/UG994: AXI4=burst/memory, AXI4-Lite=single register, AXI4-Stream=unidirectional data flow (no address)"
+        },
+        {
+          "id": "WC-03",
+          "category": "what_concepts",
+          "project": "general",
+          "type": "real",
+          "score": 0.6,
+          "term_hits": [
+            "SmartConnect",
+            "AXI Interconnect"
+          ],
+          "term_misses": [
+            "PG247",
+            "PG059",
+            "performans",
+            "newer"
+          ],
+          "val_hits": [
+            "SmartConnect",
+            "AXI Interconnect"
+          ],
+          "val_misses": [],
+          "source_chunks": 11,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "dr.bd.tcl",
+            "reference_bd.tcl",
+            "bd_network_layer.tcl",
+            "design_1.tcl",
+            "reference_bd.tcl",
+            "system_bd.tcl",
+            "README_V2.md"
+          ],
+          "query_type": "CrossRef",
+          "route_ok": true,
+          "answer_snippet": "## AXI SmartConnect vs AXI Interconnect Karşılaştırması\n\n### Context'teki Projelerden Gözlemler\n\n**AXI Interconnect kullanan projeler:**\n- [nexys_a7_dma_audio] → `axi_interconnect_0` — NUM_SI=4, NUM_MI=1 (DMA/MIG/GPIO/UART yönlendirmesi)\n- [nexys_a7_dma_audio] → `microblaze_0_axi_periph` — NUM_MI=5 ",
+          "ground_truth": "PG247/PG059: SmartConnect=newer/automatic width/clock conversion, AXI Interconnect=legacy manual config"
+        }
+      ]
+    },
+    {
+      "category": "regression_trace",
+      "label": "Regression TRACE (mevcut TRACE testleri)",
+      "score": 0.797,
+      "grade": "B",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "RT-01",
+          "category": "regression_trace",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 0.562,
+          "term_hits": [
+            "axis",
+            "fifo2audpwm",
+            "AXI-Stream",
+            "DMA",
+            "ses"
+          ],
+          "term_misses": [
+            "mig_7series",
+            "axi_dma"
+          ],
+          "val_hits": [
+            "fifo2audpwm"
+          ],
+          "val_misses": [
+            "mig_7series",
+            "axi_dma"
+          ],
+          "source_chunks": 11,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "Trace",
+          "route_ok": true,
+          "answer_snippet": "Önce bir düzeltme: `nexys_a7_dma_audio` projesi **DDR2** SDRAM kullanır (Nexys A7-100T üzerinde 128 MiB DDR2). DDR3 değil.\n\n---\n\n## Ses Verisi Bileşen Zinciri — `nexys_a7_dma_audio`\n\n```\nDDR2 SDRAM\n    │\n    ▼\nMIG 7-Series (ui_clk ~140 MHz)\n    │  AXI4 (Full) arayüzü\n    ▼\nAXI Interconnect\n    │  AX",
+          "ground_truth": "Graph TRACE: mig_7series_0 → axi_dma_0 → axis2fifo → fifo2audpwm_0"
+        },
+        {
+          "id": "RT-02",
+          "category": "regression_trace",
+          "project": "axi_gpio_example",
+          "type": "real",
+          "score": 0.829,
+          "term_hits": [
+            "microblaze_0",
+            "axi_gpio_0",
+            "GPIO",
+            "LED",
+            "AXI"
+          ],
+          "term_misses": [
+            "axi_interconnect",
+            "gpio_io_o"
+          ],
+          "val_hits": [
+            "microblaze_0",
+            "axi_gpio_0"
+          ],
+          "val_misses": [],
+          "source_chunks": 11,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "create_axi_auto.tcl",
+            "create_axi_simple.tcl",
+            "create_axi_simple_gpio.tcl",
+            "add_axi_gpio.tcl",
+            "create_axi_with_xdc.tcl",
+            "SYNTHESIS_RESULTS.md"
+          ],
+          "query_type": "Trace",
+          "route_ok": true,
+          "answer_snippet": "## MicroBlaze → GPIO LED Veri Yazma Zinciri\n\n### Sinyal Yolu (End-to-End)\n\n```\nMicroBlaze (microblaze_0)\n    │  M_AXI_DP (Data Peripheral AXI Master)\n    ▼\nAXI Interconnect (microblaze_0_axi_periph)\n    │  S00_AXI ← giriş portu\n    │  M00_AXI → çıkış portu\n    ▼\nAXI GPIO (axi_gpio_0)\n    │  S_AXI sl",
+          "ground_truth": "Graph TRACE: microblaze_0 → microblaze_0_axi_periph → axi_gpio_0 → gpio_io_o"
+        },
+        {
+          "id": "RT-03",
+          "category": "regression_trace",
+          "project": "nexys_a7_dma_audio",
+          "type": "real",
+          "score": 1.0,
+          "term_hits": [
+            "clk_wiz_0",
+            "proc_sys_reset_0",
+            "CONNECTS_TO",
+            "clock",
+            "reset",
+            "saat"
+          ],
+          "term_misses": [],
+          "val_hits": [
+            "clk_wiz_0",
+            "proc_sys_reset_0"
+          ],
+          "val_misses": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "Trace",
+          "route_ok": true,
+          "answer_snippet": "Kaynak dosyadan (`design_1.tcl`) tam bağlantı haritasını çıkardım. Detaylı yanıt aşağıda:\n\n---\n\n## `clk_wiz_0` + `rst_mig_7series_0_81M` — Gereksinim & Bağlantı Analizi\n\n> **Not:** Design'da `proc_sys_reset_0` adlı bir bileşen yok. Bu rolü `rst_mig_7series_0_81M` (`proc_sys_reset:5.0`) üstleniyor. A",
+          "ground_truth": "Graph TRACE: clk_wiz_0 CONNECTS_TO proc_sys_reset_0 (slowest_sync_clk)"
+        }
+      ]
+    },
+    {
+      "category": "trap_v5",
+      "label": "Trap v5          (workflow tuzakları)",
+      "score": 1.0,
+      "grade": "A",
+      "n_questions": 3,
+      "questions": [
+        {
+          "id": "TR5-01",
+          "category": "trap_v5",
+          "project": "general",
+          "type": "trap",
+          "score": 1.0,
+          "verdict": "PASS",
+          "hallucination_matches": [],
+          "source_chunks": 4,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "run_v3_synthesis.tcl",
+            "build.tcl",
+            "run_v2_synth_only.tcl",
+            "run_v3_synthesis_full.tcl"
+          ],
+          "query_type": "What",
+          "route_ok": true,
+          "answer_snippet": "## Non-Project Mode ve .xpr Dosyası\n\n**Hayır — Non-Project Mode'da .xpr dosyası otomatik olarak oluşturulmaz.**\n\nBu Vivado'nun temel bir davranışıdır:\n\n| Özellik | Project Mode | Non-Project Mode |\n|---|---|---|\n| `.xpr` dosyası | Otomatik oluşturulur | **Oluşturulmaz** |\n| Proje dizin yapısı | `.sr",
+          "ground_truth": "Non-project mode'da .xpr oluşmaz — sadece in-memory. .xpr yalnızca project mode'da."
+        },
+        {
+          "id": "TR5-02",
+          "category": "trap_v5",
+          "project": "general",
+          "type": "trap",
+          "score": 1.0,
+          "verdict": "PASS",
+          "hallucination_matches": [],
+          "source_chunks": 4,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "create_axi_with_xdc.tcl",
+            "connect_and_synthesize_v2.tcl",
+            "build_hdmi_video_v2_enhanced.tcl",
+            "README_V2.md"
+          ],
+          "query_type": "What",
+          "route_ok": true,
+          "answer_snippet": "**Hayır — doğrudan kullanılamaz. Wrapper olmadan sentez başarısız olur.**\n\n## Teknik Neden\n\nVivado'da bir block design (`.bd` dosyası) sentezlenebilir RTL değildir — IP Integrator'ın iç format dosyasıdır. Synthesis engine bu dosyayı doğrudan top-level olarak kabul etmez.\n\nContext'teki referans proje",
+          "ground_truth": "Block design'ın HDL wrapper'a ihtiyacı var — .bd doğrudan sentezlenemez, make_wrapper zorunlu."
+        },
+        {
+          "id": "TR5-03",
+          "category": "trap_v5",
+          "project": "nexys_a7_dma_audio",
+          "type": "trap",
+          "score": 1.0,
+          "verdict": "PASS",
+          "hallucination_matches": [],
+          "source_chunks": 10,
+          "doc_chunks": 0,
+          "doc_ids": [],
+          "chunk_files": [
+            "nexys-a7_rm.pdf"
+          ],
+          "query_type": "What",
+          "route_ok": true,
+          "answer_snippet": "**Hayır** — bu context'te `c_include_sg` parametresini doğrudan gösteren bir kaynak dosya chunk'ı mevcut değil.\n\nDaha da önemlisi, graph metadata'sı sorunun önkabulüyle **çelişiyor**:\n\n---\n\n**DMA-REQ-L2-005** (graph, HIGH confidence):\n> \"AXI DMA 7.1 **scatter-gather modu etkin**. MM2S kanalı. DDR2'd",
+          "ground_truth": "Gerçekte c_include_sg=1 (Scatter-Gather aktif). Simple DMA değil SG DMA kullanılıyor."
+        }
+      ]
+    }
+  ]
+}

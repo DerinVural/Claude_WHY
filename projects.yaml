@@ -1,0 +1,2235 @@
+variables:
+  vt: ~/Desktop/fpga_asist_dev-master/fpga_asist_dev-master/validation_test
+defaults:
+  include_exts:
+  - .v
+  - .sv
+  - .c
+  - .h
+  - .xdc
+  - .tcl
+  - .prj
+  exclude_patterns:
+  - .git
+  - __pycache__
+  - .cache
+  - _rfs.vhd
+  - _rfs.v
+  - _sim_netlist
+  - ipstatic
+  - Debug/
+projects:
+  nexys_a7_dma_audio:
+    display_name: Nexys A7 DMA Audio
+    board: Nexys A7-100T
+    fpga_part: xc7a100tcsg324-1
+    roots:
+    - '{root}/data/code/Nexys-A7-100T-DMA-Audio'
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .json
+    - .pdf
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - node_modules
+    - .ip_user_files
+    - _pycache_
+    - sim_
+    - .cache
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    specific_files:
+    - ~/Documents/nexys-a7_rm.pdf
+    file_node_map:
+      axis2fifo.v:
+      - COMP-A-axis2fifo_0
+      fifo2audpwm.v:
+      - COMP-A-fifo2audpwm_0
+      tone_generator.v:
+      - COMP-A-tone_generator_0
+      design_1.tcl:
+      - COMP-A-axi_dma_0
+      - COMP-A-mig_7series_0
+      Nexys-A7-100T-Master.xdc:
+      - COMP-A-clk_wiz_0
+      helloworld.c:
+      - COMP-A-helloworld
+      - COMP-A-axi_dma_0
+      platform.c: []
+      platform.h: []
+  axi_gpio_example:
+    display_name: AXI GPIO Example (Nexys Video)
+    board: Nexys Video
+    fpga_part: xc7a200tsbg484-1
+    roots:
+    - '{vt}/axi_example'
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .json
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - vivado_minimal_mb
+    - RUN_AXI
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    specific_files:
+    - '{vt}/axi_example/SYNTHESIS_RESULTS.md'
+    - '{root}/data/code/digilent-xdc/Nexys-Video-Master.xdc'
+    file_node_map:
+      nexys_video.xdc:
+      - COMP-B-clk_wiz_0
+      - COMP-B-rst_clk_wiz_0_100M
+      Nexys-Video-Master.xdc:
+      - COMP-B-clk_wiz_0
+      axi_gpio_wrapper.v:
+      - COMP-B-axi_gpio_wrapper
+      add_axi_gpio.tcl:
+      - COMP-B-axi_gpio_0
+      - COMP-B-microblaze_0_axi_periph
+      create_minimal_microblaze.tcl:
+      - COMP-B-microblaze_0
+      - COMP-B-clk_wiz_0
+      - COMP-B-mdm_1
+      create_axi_simple_gpio.tcl:
+      - COMP-B-axi_gpio_0
+      SYNTHESIS_RESULTS.md:
+      - COMP-B-microblaze_0
+      - COMP-B-axi_gpio_0
+      - COMP-B-clk_wiz_0
+  gtx_ddr_example:
+    display_name: GTX DDR Example (Nexys Video)
+    board: Nexys Video
+    fpga_part: xc7a200tsbg484-1
+    roots:
+    - '{vt}/gtx_ddr_example'
+    - '{root}/data/code/gtx_ddr_example'
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .md
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - vivado_zynq_gtx
+    - backup
+    - .dmp
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    specific_files:
+    - '{root}/data/code/gtx_ddr_example/vivado_zynq_gtx/zynq_gtx_ddr_project.srcs/constrs_1/new/zynq_pins.xdc'
+    file_node_map: {}
+  hdmi_video_example:
+    display_name: HDMI Video Example (Nexys Video)
+    board: Nexys Video
+    fpga_part: xc7a200tsbg484-1
+    roots:
+    - '{root}/data/code/hdmi_video_example'
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .md
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - digilent_project
+    - vivado_zynq_video
+    - xgui
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    specific_files:
+    - '{root}/data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/src/axi_dynclk.xdc'
+    - '{root}/data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/dvi2rgb/src/dvi2rgb.xdc'
+    - '{root}/data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/rgb2dvi/src/rgb2dvi.xdc'
+    - '{root}/data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/src/mmcme2_drp.v'
+    - '{root}/data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/drivers/dynclk/src/ddynclk.c'
+    - '{root}/data/code/hdmi_video_example/digilent_project/Nexys-Video-HW/Nexys-Video-HW.ipdefs/repo/vivado-library/ip/axi_dynclk/drivers/dynclk/src/ddynclk.h'
+    - '{root}/data/code/hdmi_video_example/vivado_zynq_video/zynq_video_project.srcs/constrs_1/new/video_pins.xdc'
+    file_node_map: {}
+  i2c_example:
+    display_name: I2C Example (Nexys Video)
+    board: Nexys Video
+    fpga_part: xc7a200tsbg484-1
+    roots:
+    - '{vt}/i2c_example'
+    file_node_map: {}
+  pcie_dma_ddr_example:
+    display_name: PCIe DMA DDR Example
+    board: Nexys Video
+    fpga_part: xc7a200tsbg484-1
+    roots:
+    - '{vt}/pcie_dma_ddr_example'
+    file_node_map: {}
+  pcie_xdma_mb_example:
+    display_name: PCIe XDMA MicroBlaze Example
+    board: Nexys Video
+    fpga_part: xc7a200tsbg484-1
+    roots:
+    - '{vt}/pcie_xdma_mb_example'
+    file_node_map: {}
+  rgmii_example:
+    display_name: RGMII Ethernet Example (Nexys Video)
+    board: Nexys Video
+    fpga_part: xc7a200tsbg484-1
+    roots:
+    - '{vt}/rgmii_example'
+    file_node_map: {}
+  v2_mig:
+    display_name: MIG DDR3 v2 Example
+    board: Nexys Video
+    fpga_part: xc7a200tsbg484-1
+    roots:
+    - '{vt}/v2_mig'
+    file_node_map: {}
+  v3_gtx:
+    display_name: GTX Transceiver v3 Example
+    board: Nexys Video
+    fpga_part: xc7a200tsbg484-1
+    roots:
+    - '{vt}/v3_gtx'
+    file_node_map: {}
+  spi_example:
+    display_name: SPI Pmod Example (Nexys Video)
+    board: Nexys Video
+    fpga_part: xc7a200tsbg484-1
+    roots:
+    - '{vt}/spi_example'
+    file_node_map: {}
+  uart_example:
+    display_name: UART Example
+    board: Nexys Video
+    fpga_part: xc7a200tsbg484-1
+    roots:
+    - '{vt}/uart_example'
+    file_node_map: {}
+  zybo_z7_20_pcam_5c:
+    display_name: Zybo Z7-20 Pcam 5C (MIPI CSI-2 Camera + HDMI)
+    board: Zybo Z7-20
+    fpga_part: xc7z020clg400-1
+    roots:
+    - '{vt}/Zybo-Z7-20-pcam-5c/src'
+    - '{vt}/Zybo-Z7-20-pcam-5c/sdk/appsrc/pcam_vdma_hdmi'
+    include_exts:
+    - .v
+    - .sv
+    - .vhd
+    - .c
+    - .h
+    - .cc
+    - .xdc
+    - .tcl
+    - .prj
+    - .md
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - platform
+    - '*stub*'
+    - '*sim_netlist*'
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map:
+      system.tcl:
+      - zybo_z7_20_pcam_5c
+      ZyboZ7_A.xdc:
+      - zybo_z7_20_pcam_5c
+      main.cc:
+      - zybo_z7_20_pcam_5c
+      DVIClocking.vhd:
+      - zybo_z7_20_pcam_5c
+      timing.xdc:
+      - zybo_z7_20_pcam_5c
+  arty_s7_25_base_rt:
+    display_name: Arty S7-25 Base System (Real-time Processing)
+    board: Arty S7-25
+    fpga_part: xc7s25csga324-1
+    roots:
+    - '{vt}/Arty-S7-25-base-rt/proj'
+    - '{vt}/Arty-S7-25-base-rt/sdk'
+    - '{vt}/Arty-S7-25-base-rt/src/bd/system/hw_handoff'
+    - '{vt}/Arty-S7-25-base-rt/src/bd/system/hdl'
+    include_exts:
+    - .v
+    - .sv
+    - .vhd
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    specific_files:
+    - '{vt}/Arty-S7-25-base-rt/src/constraints/Arty-S7-25-Master.xdc'
+    - '{vt}/Arty-S7-25-base-rt/src/bd/system/ip/system_mig_7series_0_0/system_mig_7series_0_0/mig.prj'
+    file_node_map: {}
+  analog_discovery_studio_cmod_s7_spi:
+    display_name: Analog-Discovery-Studio-Cmod-S7-SPI
+    board: Cmod-S7-SPI
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Analog-Discovery-Studio-Cmod-S7-SPI'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  arty_artybot:
+    display_name: Arty-ArtyBot
+    board: Arty-ArtyBot
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-ArtyBot'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  arty_bsd:
+    display_name: Arty-BSD
+    board: Arty-BSD
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-BSD'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  arty_gpio:
+    display_name: Arty-GPIO
+    board: Arty-GPIO
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-GPIO'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  arty_pmod_vga:
+    display_name: Arty-Pmod-VGA
+    board: Arty-Pmod-VGA
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-Pmod-VGA'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  arty_s7_25_base:
+    display_name: Arty-S7-25-base
+    board: Arty-S7-25-base
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-S7-25-base'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  arty_s7_25_base_uc:
+    display_name: Arty-S7-25-base-uc
+    board: Arty-S7-25-base-uc
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-S7-25-base-uc'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  arty_s7_50_base:
+    display_name: Arty-S7-50-base
+    board: Arty-S7-50-base
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-S7-50-base'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  arty_s7_50_base_rt:
+    display_name: Arty-S7-50-base-rt
+    board: Arty-S7-50-base-rt
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-S7-50-base-rt'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  arty_s7_50_base_uc:
+    display_name: Arty-S7-50-base-uc
+    board: Arty-S7-50-base-uc
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-S7-50-base-uc'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  arty_xadc:
+    display_name: Arty-XADC
+    board: Arty-XADC
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-XADC'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  arty_z7_10_oob:
+    display_name: Arty-Z7-10-OOB
+    board: Arty-Z7-10-OOB
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-Z7-10-OOB'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  arty_z7_10_base_linux:
+    display_name: Arty-Z7-10-base-linux
+    board: Arty-Z7-10-base-linux
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-Z7-10-base-linux'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  arty_z7_10_hdmi_out:
+    display_name: Arty-Z7-10-hdmi-out
+    board: Arty-Z7-10-hdmi-out
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-Z7-10-hdmi-out'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  arty_z7_20_oob:
+    display_name: Arty-Z7-20-OOB
+    board: Arty-Z7-20-OOB
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-Z7-20-OOB'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  arty_z7_20_base:
+    display_name: Arty-Z7-20-base
+    board: Arty-Z7-20-base
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-Z7-20-base'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  arty_z7_20_hdmi_in:
+    display_name: Arty-Z7-20-hdmi-in
+    board: Arty-Z7-20-hdmi-in
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-Z7-20-hdmi-in'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  arty_z7_20_hdmi_out:
+    display_name: Arty-Z7-20-hdmi-out
+    board: Arty-Z7-20-hdmi-out
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-Z7-20-hdmi-out'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  arty_z7_20_linux_bd:
+    display_name: Arty-Z7-20-linux_bd
+    board: Arty-Z7-20-linux
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Arty-Z7-20-linux_bd'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  artys7_rpu_soc:
+    display_name: ArtyS7-RPU-SoC
+    board: ArtyS7-RPU-SoC
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/ArtyS7-RPU-SoC'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  artyz7_20_dmmshield_library:
+    display_name: ArtyZ7-20-DMMShield-Library
+    board: ArtyZ7-20-DMMShield-Library
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/ArtyZ7-20-DMMShield-Library'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  artyz7_20_dmmshield_oled_demo:
+    display_name: ArtyZ7-20-DMMShield-OLED-Demo
+    board: ArtyZ7-20-DMMShield-OLED-Demo
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/ArtyZ7-20-DMMShield-OLED-Demo'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  artyz7_20_dmmshield_webserver_demo:
+    display_name: ArtyZ7-20-DMMShield-Webserver-Demo
+    board: ArtyZ7-20-DMMShield-Webserver-Demo
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/ArtyZ7-20-DMMShield-Webserver-Demo'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  basys_3_gpio:
+    display_name: Basys-3-GPIO
+    board: Basys-3-GPIO
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Basys-3-GPIO'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  cmod_s7_25_xadc:
+    display_name: Cmod-S7-25-XADC
+    board: Cmod-S7-25-XADC
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Cmod-S7-25-XADC'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  cora_z7_07s_xadc:
+    display_name: Cora-Z7-07S-XADC
+    board: Cora-Z7-07S-XADC
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Cora-Z7-07S-XADC'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  cora_z7_07s_base_linux:
+    display_name: Cora-Z7-07S-base-linux
+    board: Cora-Z7-07S-base-linux
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Cora-Z7-07S-base-linux'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  cora_z7_10_pi_estimator_vga:
+    display_name: Cora-Z7-10-Pi-Estimator-VGA
+    board: Cora-Z7-10-Pi-Estimator-VGA
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Cora-Z7-10-Pi-Estimator-VGA'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  cora_z7_10_xadc:
+    display_name: Cora-Z7-10-XADC
+    board: Cora-Z7-10-XADC
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Cora-Z7-10-XADC'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  cora_z7_10_base_linux:
+    display_name: Cora-Z7-10-base-linux
+    board: Cora-Z7-10-base-linux
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Cora-Z7-10-base-linux'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  ebaz4205:
+    display_name: EBAZ4205
+    board: EBAZ4205
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/EBAZ4205'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  eclypse_z7_hw:
+    display_name: Eclypse-Z7-HW
+    board: Eclypse-Z7-HW
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Eclypse-Z7-HW'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  eclypse_z7_oob:
+    display_name: Eclypse-Z7-OOB
+    board: Eclypse-Z7-OOB
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Eclypse-Z7-OOB'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  genesys_2_dma:
+    display_name: Genesys-2-DMA
+    board: Genesys-2-DMA
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Genesys-2-DMA'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  genesys_2_hdmi:
+    display_name: Genesys-2-HDMI
+    board: Genesys-2-HDMI
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Genesys-2-HDMI'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  genesys_2_keyboard:
+    display_name: Genesys-2-Keyboard
+    board: Genesys-2-Keyboard
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Genesys-2-Keyboard'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  genesys_2_oled:
+    display_name: Genesys-2-OLED
+    board: Genesys-2-OLED
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Genesys-2-OLED'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  nexys_4_abacus:
+    display_name: Nexys-4-Abacus
+    board: Nexys-4-Abacus
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Nexys-4-Abacus'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  nexys_4_ddr_music_looper:
+    display_name: Nexys-4-DDR-Music-Looper
+    board: Nexys-4-DDR-Music-Looper
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Nexys-4-DDR-Music-Looper'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  nexys_4_gpio:
+    display_name: Nexys-4-GPIO
+    board: Nexys-4-GPIO
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Nexys-4-GPIO'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  nexys_4_oob:
+    display_name: Nexys-4-OOB
+    board: Nexys-4-OOB
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Nexys-4-OOB'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  nexys_4_xadc:
+    display_name: Nexys-4-XADC
+    board: Nexys-4-XADC
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Nexys-4-XADC'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  nexys_a7_50t_dma_audio:
+    display_name: Nexys-A7-50T-DMA-Audio
+    board: Nexys-A7-50T-DMA-Audio
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Nexys-A7-50T-DMA-Audio'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  nexys_video_axi_ps2_keyboard:
+    display_name: Nexys-Video-AXI-PS2-Keyboard
+    board: Nexys-Video-AXI-PS2-Keyboard
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Nexys-Video-AXI-PS2-Keyboard'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  nexys_video_dma:
+    display_name: Nexys-Video-DMA
+    board: Nexys-Video-DMA
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Nexys-Video-DMA'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  nexys_video_hdmi:
+    display_name: Nexys-Video-HDMI
+    board: Nexys-Video-HDMI
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Nexys-Video-HDMI'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  pmod_i2s2:
+    display_name: Pmod-I2S2
+    board: Cmod-S7-25
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Pmod-I2S2'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  usb104_a7_oob:
+    display_name: USB104-A7-OOB
+    board: USB104-A7-OOB
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/USB104-A7-OOB'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  usb104a7_zmodadc:
+    display_name: USB104A7-ZmodADC
+    board: USB104A7-ZmodADC
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/USB104A7-ZmodADC'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .cc
+  vitis_embedded_platform_source:
+    display_name: Vitis_Embedded_Platform_Source
+    board: Vitis_Embedded_Platform_Source
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Vitis_Embedded_Platform_Source'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  zedboard_fmc_pcam_adapter_demo:
+    display_name: ZedBoard-FMC-Pcam-Adapter-DEMO
+    board: ZedBoard-FMC-Pcam-Adapter-DEMO
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/ZedBoard-FMC-Pcam-Adapter-DEMO'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .cc
+  zedboard_fmc_pcam_adapter_dual_camera:
+    display_name: ZedBoard-FMC-Pcam-Adapter-Dual-Camera
+    board: ZedBoard-FMC-Pcam-Adapter-Dual-Camera
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/ZedBoard-FMC-Pcam-Adapter-Dual-Camera'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .cc
+  zedboard_dma:
+    display_name: Zedboard-DMA
+    board: Zedboard-DMA
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zedboard-DMA'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  zedboard_uart_demo:
+    display_name: Zedboard-uart_demo
+    board: Zedboard-uart
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zedboard-uart_demo'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  zybo_xadc:
+    display_name: Zybo-XADC
+    board: Zybo-XADC
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zybo-XADC'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  zybo_z7_10_dma:
+    display_name: Zybo-Z7-10-DMA
+    board: Zybo-Z7-10-DMA
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zybo-Z7-10-DMA'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  zybo_z7_10_hdmi:
+    display_name: Zybo-Z7-10-HDMI
+    board: Zybo-Z7-10-HDMI
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zybo-Z7-10-HDMI'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  zybo_z7_10_base_linux:
+    display_name: Zybo-Z7-10-base-linux
+    board: Zybo-Z7-10-base-linux
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zybo-Z7-10-base-linux'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  zybo_z7_20_dma:
+    display_name: Zybo-Z7-20-DMA
+    board: Zybo-Z7-20-DMA
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zybo-Z7-20-DMA'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  zybo_z7_20_hdmi:
+    display_name: Zybo-Z7-20-HDMI
+    board: Zybo-Z7-20-HDMI
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zybo-Z7-20-HDMI'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  zybo_z7_20_pmod_comm_hw:
+    display_name: Zybo-Z7-20-PMOD-Comm-hw
+    board: Zybo-Z7-20-PMOD-Comm-hw
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zybo-Z7-20-PMOD-Comm-hw'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  zybo_z7_20_base_linux:
+    display_name: Zybo-Z7-20-base-linux
+    board: Zybo-Z7-20-base-linux
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zybo-Z7-20-base-linux'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+    - .cpp
+  zybo_base_linux:
+    display_name: Zybo-base-linux
+    board: Zybo-base-linux
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zybo-base-linux'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .sv
+  zybo_hdmi_in:
+    display_name: Zybo-hdmi-in
+    board: Zybo-hdmi-in
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zybo-hdmi-in'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  zybo_hdmi_out:
+    display_name: Zybo-hdmi-out
+    board: Zybo-hdmi-out
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/Zybo-hdmi-out'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - vivado-library
+    - repo/vivado-library
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+  zyboz7_20_pmodtof_demo:
+    display_name: ZyboZ7-20-PmodToF-Demo
+    board: ZyboZ7-20-PmodToF-Demo
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/ZyboZ7-20-PmodToF-Demo'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  arty_template_hdl:
+    display_name: arty-template-hdl
+    board: arty-template-hdl
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/arty-template-hdl'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  fpga_vbs:
+    display_name: fpga-vbs
+    board: fpga-vbs
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/fpga-vbs'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+  xup_vitis_network_example:
+    display_name: xup_vitis_network_example
+    board: xup_vitis_network_example
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/xup_vitis_network_example'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}
+    include_exts:
+    - .v
+    - .sv
+    - .c
+    - .h
+    - .xdc
+    - .tcl
+    - .prj
+    - .vhd
+    - .cpp
+  zybo_template_hdl:
+    display_name: zybo-template-hdl
+    board: zybo-template-hdl
+    fpga_part: ''
+    roots:
+    - '{root}/data/code/zybo-template-hdl'
+    exclude_patterns:
+    - .git
+    - __pycache__
+    - .cache
+    - .gen
+    - .runs
+    - .hw
+    - .ip_user_files
+    - ipshared
+    - _rfs.vhd
+    - _rfs.v
+    - _sim_netlist
+    - ipstatic
+    - Debug/
+    file_node_map: {}

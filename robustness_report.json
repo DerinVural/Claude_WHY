@@ -1,30 +1,30 @@
 {
-  "timestamp": "2026-02-26T14:12:36.306029",
-  "total_score": 0.94,
+  "timestamp": "2026-03-12T14:09:34.164145",
+  "total_score": 0.864,
   "overall_grade": "A",
-  "elapsed_s": 383.5,
+  "elapsed_s": 556.5,
   "tests": [
     {
       "test": "A_held_out_file",
-      "score": 1.0,
-      "grade": "A",
+      "score": 0.667,
+      "grade": "B",
       "faz1_score": 1.0,
-      "faz2_score": 1.0,
+      "faz2_score": 0.0,
       "faz3_score": 1.0,
       "faz1_design1_indexed": true,
-      "faz2_says_unknown": true,
+      "faz2_says_unknown": false,
       "faz2_still_hallucinated": true,
       "faz3_recovered": true,
-      "held_out_chunks": 39,
-      "restored_chunks": 39
+      "held_out_chunks": 0,
+      "restored_chunks": 42
     },
     {
       "test": "B_fabrication_recall",
-      "score": 0.974,
+      "score": 0.883,
       "grade": "A",
-      "precision": 1.0,
+      "precision": 0.825,
       "recall": 0.95,
-      "f1": 0.974,
+      "f1": 0.883,
       "trap_results": [
         {
           "id": "B-TRAP-1",
@@ -34,7 +34,7 @@
           "says_unknown": true,
           "hallucination_detected": false,
           "hallucination_values": [],
-          "answer_snippet": "## axis2fifo Modülü — FIFO Derinliği ve Latency\n\n### Context'teki Mevcut Bilgiler\n\nSağlanan context'te **axis2fifo** modülünün iç parametreleri (FIFO derinliği / stage sayısı, minimum latency) hakkınd"
+          "answer_snippet": "Context'teki verilerden şunları söyleyebilirim:\n\n**FIFO Derinliği**\n\n`axis2fifo` bir custom wrapper modüldür ve bağımlı olduğu IP `fifo_generator_0`'dır:\n\n```\nnexys_a7_dma_audio/design_1.tcl — fifo_ge"
         },
         {
           "id": "B-TRAP-2",
@@ -44,7 +44,7 @@
           "says_unknown": true,
           "hallucination_detected": false,
           "hallucination_values": [],
-          "answer_snippet": "## Yanıt\n\nContext'te bu soruya verilecek bilgi **bulunamamaktadır**.\n\nSağlanan kaynak dosyalar ve node'lar incelendiğinde:\n\n- **Test ekipmanı**: `tone_generator` modülünün frekans doğruluğunu doğrulam"
+          "answer_snippet": "Bu bilgiler referans projelerinde bulunmamaktadır.\n\nContext'teki tüm kanıtlar incelendiğinde:\n\n- **EVID-A-003**: `axis_tlast = 1'b1` bug — paket sınırı hatalı\n- **EVID-A-012**: README.md'de `\"tone_gen"
         },
         {
           "id": "B-TRAP-3",
@@ -54,17 +54,17 @@
           "says_unknown": true,
           "hallucination_detected": false,
           "hallucination_values": [],
-          "answer_snippet": "## MicroBlaze L1 Data Cache — Nexys Video Projesi\n\nBu sorunun yanıtı context'teki kaynak dosyalarda **açıkça belirtilmemiştir**.\n\n### Context'te Bulunan Bilgi\n\n**AXI-REQ-L2-002** node'una göre:\n\n> *\"M"
+          "answer_snippet": "Context'te en detaylı Nexys Video verisi `hdmi_video_example` projesinden geliyor:\n\n**Kaynak:** `hdmi_video_example/src/bd/hdmi.tcl` (lines 548-582)\n\n| Parametre | Değer |\n|---|---|\n| `C_DCACHE_BYTE_S"
         },
         {
           "id": "B-TRAP-4",
           "note": "Projede I2S yok, PWM audio kullanıyor — BCLK/MCLK/LRCLK gibi I2S-spesifik değerler hallucination",
-          "score": 1.0,
-          "verdict": "PASS",
-          "says_unknown": true,
+          "score": 0.3,
+          "verdict": "PARTIAL",
+          "says_unknown": false,
           "hallucination_detected": false,
           "hallucination_values": [],
-          "answer_snippet": "## Yanıt: I2S Audio Interface Hakkında\n\nContext'te yapılan incelemeye göre, **bu projede I2S audio interface kullanılmamaktadır.**\n\n### Projede Kullanılan Ses Arayüzü\n\nBu proje (Nexys-A7-100T-DMA-Audi"
+          "answer_snippet": "Context'e göre `nexys_a7_dma_audio` projesi **I2S audio interface kullanmıyor**.\n\nProje, PDM (Pulse Density Modulation) tabanlı bir ses mimarisi kullanıyor:\n\n- **Mikrofon girişi**: PDM dijital mikrofo"
         }
       ],
       "real_results": [
@@ -81,10 +81,15 @@
           "val_hits": [
             "1"
           ],
-          "source_chunks": 12,
+          "source_chunks": 13,
           "chunk_files": [
             "design_1.tcl",
-            "helloworld.c"
+            "system.tcl",
+            "artyBot_bd.tcl",
+            "system_bd.tcl",
+            "design_1_bd.tcl",
+            "design_1.tcl",
+            "system.tcl"
           ]
         },
         {
@@ -99,13 +104,12 @@
           "val_hits": [
             "8"
           ],
-          "source_chunks": 12,
+          "source_chunks": 14,
           "chunk_files": [
-            "create_axi_simple_gpio.tcl",
             "add_axi_gpio.tcl",
-            "axi_gpio_wrapper.v",
-            "SYNTHESIS_RESULTS.md",
-            "create_axi_simple.tcl"
+            "create_axi_with_xdc.tcl",
+            "create_axi_simple.tcl",
+            "create_axi_simple_gpio.tcl"
           ]
         },
         {
@@ -114,14 +118,19 @@
           "score": 0.8,
           "term_hits": [
             "R4",
-            "clk"
+            "LVCMOS33"
           ],
           "val_hits": [
             "R4"
           ],
-          "source_chunks": 10,
+          "source_chunks": 15,
           "chunk_files": [
-            "Nexys-Video-Master.xdc"
+            "test_spi_simple.tcl",
+            "autostart_spi_bd_validation.tcl",
+            "create_spi_bd.tcl",
+            "spi_nexys_video.xdc",
+            "validate_spi_bd_gui.tcl",
+            "create_spi_with_xdc.tcl"
           ]
         },
         {
@@ -137,8 +146,11 @@
           "val_hits": [
             "XST_FAILURE"
           ],
-          "source_chunks": 12,
+          "source_chunks": 19,
           "chunk_files": [
+            "helloworld.c",
+            "design_1.tcl",
+            "nexys-a7_rm.pdf",
             "helloworld.c"
           ]
         }
@@ -146,15 +158,15 @@
     },
     {
       "test": "C_multihop_traversal",
-      "score": 0.911,
+      "score": 0.956,
       "grade": "A",
       "questions": [
         {
           "id": "C-HOP-1",
           "hops": 2,
           "score": 1.0,
-          "graph_nodes_retrieved": 54,
-          "graph_edges_retrieved": 127,
+          "graph_nodes_retrieved": 39,
+          "graph_edges_retrieved": 87,
           "node_coverage": 1.0,
           "node_hits": [
             "mig_7series_0",
@@ -169,17 +181,16 @@
         {
           "id": "C-HOP-2",
           "hops": 2,
-          "score": 0.867,
-          "graph_nodes_retrieved": 35,
-          "graph_edges_retrieved": 64,
-          "node_coverage": 0.667,
+          "score": 1.0,
+          "graph_nodes_retrieved": 29,
+          "graph_edges_retrieved": 35,
+          "node_coverage": 1.0,
           "node_hits": [
             "microblaze_0",
+            "microblaze_0_axi_periph",
             "axi_gpio_0"
           ],
-          "node_misses": [
-            "microblaze_0_axi_periph"
-          ],
+          "node_misses": [],
           "has_enough_nodes": true,
           "has_enough_edges": true
         },
@@ -187,8 +198,8 @@
           "id": "C-HOP-3",
           "hops": 3,
           "score": 0.867,
-          "graph_nodes_retrieved": 46,
-          "graph_edges_retrieved": 96,
+          "graph_nodes_retrieved": 23,
+          "graph_edges_retrieved": 32,
           "node_coverage": 0.667,
           "node_hits": [
             "tone_generator_0",
@@ -204,21 +215,23 @@
     },
     {
       "test": "D_cross_project",
-      "score": 0.772,
-      "grade": "B",
+      "score": 0.939,
+      "grade": "A",
       "questions": [
         {
           "id": "D-CROSS-1",
-          "score": 0.4,
-          "term_coverage": 0.4,
+          "score": 0.9,
+          "term_coverage": 0.8,
           "term_hits": [
             "clk_wiz",
-            "benzer"
+            "benzer",
+            "aynı ip",
+            "xilinx"
           ],
-          "cross_project_refs": false,
+          "cross_project_refs": true,
           "proj_a_referenced": true,
-          "proj_b_referenced": false,
-          "graph_edges": 39,
+          "proj_b_referenced": true,
+          "graph_edges": 83,
           "notes": "ANALOGOUS_TO edge var: COMP-A-clk_wiz_0 ↔ COMP-B-clk_wiz_0"
         },
         {
@@ -235,7 +248,7 @@
           "cross_project_refs": true,
           "proj_a_referenced": true,
           "proj_b_referenced": true,
-          "graph_edges": 8,
+          "graph_edges": 62,
           "notes": "İki projede de microblaze_0 var, farklı cache/debug config"
         },
         {
@@ -252,7 +265,7 @@
           "cross_project_refs": true,
           "proj_a_referenced": true,
           "proj_b_referenced": true,
-          "graph_edges": 9,
+          "graph_edges": 197,
           "notes": "CrossRef route ile ANALOGOUS_TO/REUSES_PATTERN edge'leri gelecek"
         }
       ]
@@ -265,7 +278,7 @@
       "faz2_warning_fired": true,
       "faz2_conflict_mentioned": true,
       "faz2_both_modes_mentioned": true,
-      "crossref_new_edges": 9,
+      "crossref_new_edges": 142,
       "faz1_score": 1.0,
       "faz2_score": 1.0
     }
